@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from app.api.schemas import CreateAnalysisRequest, CreateAnalysisResponse
-from app.llm.catalog import available_models
+from app.llm.registry import available_models
 
 router = APIRouter(prefix="/api")
 
