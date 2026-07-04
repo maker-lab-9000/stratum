@@ -111,7 +111,7 @@ async def run_analysis(
 
         emit({"stage": "enrich", "status": "started"})
         enrichment = await deps.enrich_hops(traceroute.get("hops", []))
-        emit({"stage": "enrich", "status": "completed"})
+        emit({"stage": "enrich", "status": "completed", "data": enrichment})
 
         bundle = assemble_bundle(
             url=url,
@@ -142,7 +142,7 @@ async def run_analysis(
         emit({"stage": "analyze", "status": "started"})
         verdict = await _analyze(bundle, deps.analyze)
         degraded = verdict["verdict_json"].get("status") == "unavailable"
-        emit({"stage": "analyze", "status": "degraded" if degraded else "completed"})
+        emit({"stage": "analyze", "status": "degraded" if degraded else "completed", "data": verdict["verdict_json"]})
 
         repo.update(
             report_id,
@@ -169,26 +169,27 @@ async def _collect(url, options, deps, emit):
         emit({"stage": "dns", "status": "started"})
         try:
             result = await deps.resolve_dns(url)
-            emit({"stage": "dns", "status": "completed"})
+            emit({"stage": "dns", "status": "completed", "data": result})
             return result
         except DnsError as exc:
-            emit({"stage": "dns", "status": "failed", "error": str(exc)})
-            return {"error": {"type": type(exc).__name__, "message": str(exc)}}
+            gap = {"error": {"type": type(exc).__name__, "message": str(exc)}}
+            emit({"stage": "dns", "status": "failed", "error": str(exc), "data": gap})
+            return gap
 
     async def traceroute_stage():
         emit({"stage": "traceroute", "status": "started"})
         result = await deps.run_traceroute(url)
         status = "failed" if result.get("error") else "completed"
-        emit({"stage": "traceroute", "status": status})
+        emit({"stage": "traceroute", "status": status, "data": result})
         return result
 
     async def warm_then_sample_stage():
         emit({"stage": "warm", "status": "started"})
         warm = await deps.warm_cache(url, options.get("warm", True))
-        emit({"stage": "warm", "status": "completed" if warm.get("warmed") or warm.get("skipped") else "failed"})
+        emit({"stage": "warm", "status": "completed" if warm.get("warmed") or warm.get("skipped") else "failed", "data": warm})
         emit({"stage": "sample", "status": "started"})
         samples = await deps.sample_requests(url, options)
-        emit({"stage": "sample", "status": "completed"})
+        emit({"stage": "sample", "status": "completed", "data": samples})
         return warm, samples
 
     dns, traceroute, (warm, samples) = await asyncio.gather(

@@ -23,6 +23,10 @@ class PipelineManager:
         self._buses: dict[str, JobBus] = {}
         self._tasks: dict[str, asyncio.Task] = {}
 
+    @property
+    def vantage(self) -> str | None:
+        return self._vantage
+
     def submit(self, report_id: str, url: str, options: dict) -> JobBus:
         """Enqueue an analysis. Returns its JobBus (for streaming)."""
         bus = JobBus()

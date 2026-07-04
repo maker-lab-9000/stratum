@@ -1,27 +1,27 @@
-"""FastAPI application entrypoint.
+"""Production FastAPI app: real repository + pipeline manager, wired from env.
 
-Scaffold state: health endpoint + create-on-boot DB init. The analysis API,
-pipeline, and streaming land in later tasks (see stratum-action-plan.md).
+The LLM ``analyze`` callable is still None until T12, so live runs produce the
+degraded verdict — the full evidence pipeline and API are otherwise complete.
 """
 
-from contextlib import asynccontextmanager
+from __future__ import annotations
 
-from fastapi import FastAPI
+import os
 
-from app.db import get_engine, init_db
+from app.api.factory import create_app
+from app.db import get_engine, get_repository, init_db
+from app.pipeline.manager import PipelineManager
+from app.pipeline.orchestrator import default_deps
 
+# Create-on-boot (spec §6).
+init_db(get_engine())
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Create-on-boot (spec §6): ensure the reports table exists before serving.
-    init_db(get_engine())
-    yield
+_repo = get_repository()
+_manager = PipelineManager(
+    _repo,
+    concurrency=int(os.getenv("PIPELINE_CONCURRENCY", "2")),
+    deps=default_deps(analyze=None),  # T12 wires the real LLM analyze
+    vantage=os.getenv("VANTAGE_LABEL", "unknown vantage"),
+)
 
-
-app = FastAPI(title="Stratum", version="0.1.0", lifespan=lifespan)
-
-
-@app.get("/api/health")
-async def health() -> dict[str, str]:
-    """Liveness probe used by Docker/health checks and T01's smoke test."""
-    return {"status": "ok"}
+app = create_app(_repo, _manager)
