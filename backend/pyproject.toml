@@ -7,11 +7,13 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "sqlalchemy>=2.0",
+    "dnspython>=2.7",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
+    "pytest-asyncio>=0.24",
     "httpx>=0.28",
     "respx>=0.22",
     "psycopg[binary]>=3.2",
@@ -19,7 +21,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra -m 'not live'"
+asyncio_mode = "auto"
 markers = [
     "live: tests that make real network or real LLM calls (excluded by default)",
     "postgres: tests that require a live Postgres instance",
