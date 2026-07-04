@@ -40,8 +40,34 @@ async def create_analysis(body: CreateAnalysisRequest, request: Request) -> Crea
         model=body.model,
         vantage=manager.vantage,
     )
-    manager.submit(report.id, body.url, body.options.model_dump())
+    manager.submit(
+        report.id, body.url, body.options.model_dump(),
+        provider=body.provider, model=body.model,
+    )
     return CreateAnalysisResponse(id=report.id)
+
+
+@router.post("/analyses/{report_id}/rerun", response_model=CreateAnalysisResponse,
+             status_code=status.HTTP_201_CREATED)
+async def rerun_analysis(report_id: str, request: Request) -> CreateAnalysisResponse:
+    """Re-run an analysis with the original's url/provider/model (spec §5.2 —
+    the degraded report offers a re-run). Creates a fresh report; the original
+    is left untouched. Options fall back to defaults (not persisted per report)."""
+    repo = request.app.state.repo
+    manager = request.app.state.manager
+    original = repo.get(report_id)
+    if original is None:
+        raise HTTPException(status_code=404, detail="report not found")
+
+    new_report = repo.create(
+        url=original.url, provider=original.provider, model=original.model,
+        vantage=manager.vantage,
+    )
+    manager.submit(
+        new_report.id, original.url, {},
+        provider=original.provider, model=original.model,
+    )
+    return CreateAnalysisResponse(id=new_report.id)
 
 
 @router.get("/analyses")

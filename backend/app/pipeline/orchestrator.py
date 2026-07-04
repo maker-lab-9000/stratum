@@ -100,6 +100,8 @@ async def run_analysis(
     emit: Callable[[dict], object],
     deps: PipelineDeps,
     vantage: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> None:
     """Execute the pipeline for one report. Updates status in ``repo`` and emits
     progress events. Never raises except to propagate cancellation."""
@@ -140,7 +142,7 @@ async def run_analysis(
             return
 
         emit({"stage": "analyze", "status": "started"})
-        verdict = await _analyze(bundle, deps.analyze)
+        verdict = await _analyze(bundle, deps.analyze, provider, model)
         degraded = verdict["verdict_json"].get("status") == "unavailable"
         emit({"stage": "analyze", "status": "degraded" if degraded else "completed", "data": verdict["verdict_json"]})
 
@@ -198,13 +200,13 @@ async def _collect(url, options, deps, emit):
     return dns, traceroute, warm, samples
 
 
-async def _analyze(bundle: dict, analyze) -> dict:
+async def _analyze(bundle: dict, analyze, provider: str | None, model: str | None) -> dict:
     """Run the LLM step. Any failure (or no LLM configured) yields the degraded
-    'unavailable' verdict — the T14 contract — never a raise."""
+    'unavailable' verdict — evidence is already persisted — never a raise (§2 #5)."""
     if analyze is None:
         return {"verdict_json": {"status": "unavailable", "reason": "LLM not configured"}, "llm_json": None}
     try:
-        result = await analyze(bundle)
+        result = await analyze(bundle, provider, model)
         return {"verdict_json": result["verdict_json"], "llm_json": result.get("llm_json")}
     except Exception as exc:  # noqa: BLE001
         return {

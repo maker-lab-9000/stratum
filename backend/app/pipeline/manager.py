@@ -27,19 +27,28 @@ class PipelineManager:
     def vantage(self) -> str | None:
         return self._vantage
 
-    def submit(self, report_id: str, url: str, options: dict) -> JobBus:
+    def submit(
+        self, report_id: str, url: str, options: dict,
+        *, provider: str | None = None, model: str | None = None,
+    ) -> JobBus:
         """Enqueue an analysis. Returns its JobBus (for streaming)."""
         bus = JobBus()
         self._buses[report_id] = bus
-        self._tasks[report_id] = asyncio.create_task(self._run(report_id, url, options, bus))
+        self._tasks[report_id] = asyncio.create_task(
+            self._run(report_id, url, options, bus, provider, model)
+        )
         return bus
 
-    async def _run(self, report_id: str, url: str, options: dict, bus: JobBus) -> None:
+    async def _run(
+        self, report_id: str, url: str, options: dict, bus: JobBus,
+        provider: str | None = None, model: str | None = None,
+    ) -> None:
         try:
             async with self._semaphore:
                 await run_analysis(
                     report_id, url, options,
                     repo=self._repo, emit=bus.emit, deps=self._deps, vantage=self._vantage,
+                    provider=provider, model=model,
                 )
         except asyncio.CancelledError:
             # Cancelled before/while running: ensure a terminal state exists.

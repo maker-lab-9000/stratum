@@ -73,7 +73,7 @@ def make_deps(*, dns=DNS_OK, warm=WARM_OK, samples=None, traceroute=TRACE_OK,
 
     analyze_fn = None
     if analyze is not None:
-        async def analyze_fn(bundle):  # noqa: F811
+        async def analyze_fn(bundle, provider=None, model=None):  # noqa: F811
             if isinstance(analyze, Exception):
                 raise analyze
             return analyze
