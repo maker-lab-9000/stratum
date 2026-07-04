@@ -1,0 +1,27 @@
+[project]
+name = "stratum-backend"
+version = "0.1.0"
+description = "Stratum — Cache & Delivery Analyzer (backend + pipeline)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",
+    "respx>=0.22",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "live: tests that make real network or real LLM calls (excluded by default)",
+    "postgres: tests that require a live Postgres instance",
+]
+
+[tool.uv]
+package = false

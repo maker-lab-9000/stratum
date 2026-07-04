@@ -1,0 +1,34 @@
+# Operator/spec docs (kept local, not committed)
+cache-report-mockup.html
+CLAUDE.md
+progress.md
+stratum-action-plan.md
+stratum-requirements.md
+
+# Python / backend
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Data
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# OS / editor
+.DS_Store

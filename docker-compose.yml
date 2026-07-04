@@ -1,0 +1,19 @@
+# Stratum — Docker Compose (STUB, T01).
+#
+# This is a scaffold placeholder. The full deployment — Playwright base image,
+# tcptraceroute install, single-origin static serving, MaxMind download, and the
+# optional Postgres service — is built in T21 (spec §9).
+#
+# KEY INFRA CONSTRAINT (spec §9): the `api` service runs TCP traceroute and
+# therefore needs the NET_RAW (and likely NET_ADMIN) capability, or host
+# networking. This is wired and documented properly in T21.
+
+services:
+  api:
+    build: ./backend
+    # cap_add: [NET_RAW, NET_ADMIN]   # required for traceroute — enabled in T21
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    # volumes / db / frontend static serving added in T21.
