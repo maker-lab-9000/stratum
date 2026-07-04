@@ -135,6 +135,125 @@ table.prog tr.served-row th { color: var(--hit); }
 .strip i { width: 13px; height: 13px; border-radius: 3px; background: var(--raise); }
 .strip i.h { background: var(--hit); } .strip i.m { background: var(--miss); } .strip i.u { background: transparent; border: 1px dashed var(--lo); box-sizing: border-box; }
 
+/* ============================================================================
+   REPORT top bar + footnote (ported from the mockup)
+   ========================================================================== */
+.topbar { position: sticky; top: 0; z-index: 30; background: rgba(14, 20, 25, .82); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-soft); }
+.topbar-inner { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
+.topbar .brand .sub { color: var(--lo); font-weight: 400; font-size: 12px; }
+.target { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.target .url { font-family: var(--mono); font-size: 13px; color: var(--hi); padding: 7px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.meta-pills { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.footnote { margin-top: 30px; font-size: 12px; color: var(--lo); text-align: center; line-height: 1.6; }
+@media (max-width: 880px) {
+  .meta-pills .pill { display: none; }
+  .meta-pills .pill.keep { display: inline-flex; }
+  .topbar-inner { flex-wrap: wrap; }
+}
+
+/* ============================================================================
+   SECTION 01 — verdict tiles + network route (ported from the mockup)
+   ========================================================================== */
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+.verdict { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 22px; }
+.route-grid { display: grid; grid-template-columns: 320px 1fr; gap: 14px; margin-top: 14px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; }
+
+/* DNS panel */
+.dns { padding: 20px; }
+.dns h3 { font-family: var(--disp); font-weight: 600; font-size: 14px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+.dns h3 .badge { font-size: 10px; }
+.kv { display: flex; flex-direction: column; gap: 13px; }
+.kv .item .kl { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--lo); margin-bottom: 5px; }
+.kv .item .kvval { font-family: var(--mono); font-size: 12px; color: var(--hi); word-break: break-all; line-height: 1.5; }
+.cname { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.cname .seg { font-family: var(--mono); font-size: 11.5px; padding: 6px 9px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--mid); position: relative; }
+/* provider identity is structural (accent), not a hit/miss status */
+.cname .seg.sig { color: var(--accent); border-color: rgba(91, 157, 240, .35); background: var(--acc-bg); }
+/* signature label is data-driven (vendor from the LLM verdict) — real DOM on its own line */
+.cname .seg .siglabel { display: block; font-size: 9.5px; letter-spacing: .04em; color: var(--accent); opacity: .85; text-transform: uppercase; margin-top: 3px; }
+.cname .arr { color: var(--lo); font-size: 11px; margin-left: 6px; }
+.dns .ttl-row { display: flex; gap: 18px; margin-top: 4px; }
+.dns .ttl-row .item { flex: 1; }
+
+/* geomap */
+.geo-wrap { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.geo-head { padding: 16px 20px 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.geo-head h3 { font-family: var(--disp); font-weight: 600; font-size: 14px; margin: 0; }
+.geo-head .vantage { font-family: var(--mono); font-size: 11px; color: var(--mid); background: var(--panel-2); border: 1px solid var(--border-soft); padding: 4px 9px; border-radius: 6px; }
+.geo-head .vantage b { color: var(--accent); font-weight: 600; }
+.geomap { position: relative; flex: 1; min-height: 300px; margin: 0 14px 14px; border-radius: 10px; overflow: hidden; background: radial-gradient(circle at center, rgba(91, 157, 240, .05), transparent 70%), linear-gradient(0deg, #0c1217, #0c1217); border: 1px solid var(--border-soft); }
+.geomap .dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(154, 171, 184, .10) 1px, transparent 1px); background-size: 22px 22px; }
+.grat { position: absolute; background: rgba(154, 171, 184, .08); }
+.grat.v { top: 0; bottom: 0; width: 1px; } .grat.h { left: 0; right: 0; height: 1px; }
+.grat .glab { position: absolute; font-family: var(--mono); font-size: 10px; color: var(--mid); opacity: .8; padding: 2px; }
+.grat.v .glab { bottom: 4px; left: 4px; } .grat.h .glab { left: 4px; top: 3px; }
+.geosvg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.route-path { fill: none; stroke: var(--accent); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-dasharray: 5 4; opacity: .9; animation: dash 1.4s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -18; } }
+.gnode { position: absolute; transform: translate(-50%, -50%); z-index: 3; }
+.gnode .pt { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--bg); }
+.gnode.vantage .pt { background: var(--accent); box-shadow: 0 0 0 4px rgba(91, 157, 240, .18), 0 0 16px rgba(91, 157, 240, .6); }
+.gnode.pop .pt { background: var(--hi); box-shadow: 0 0 0 4px rgba(233, 239, 244, .14); }
+.gnode .glabel { position: absolute; white-space: nowrap; font-family: var(--disp); font-size: 12px; font-weight: 600; color: var(--hi); top: 50%; transform: translateY(-50%); }
+.gnode .glabel .sub { display: block; font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--mid); margin-top: 1px; }
+.gnode.vantage .glabel { left: 20px; } .gnode.pop .glabel { right: 20px; text-align: right; }
+.gnode .gtag { font-family: var(--mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; display: inline-block; margin-bottom: 3px; }
+.gnode.vantage .gtag { color: var(--accent); background: var(--acc-bg); } .gnode.pop .gtag { color: var(--hi); background: rgba(233, 239, 244, .12); }
+.geo-foot { padding: 0 20px 16px; font-family: var(--mono); font-size: 11px; color: var(--lo); display: flex; gap: 16px; flex-wrap: wrap; }
+.geo-foot b { color: var(--mid); font-weight: 500; }
+
+/* route strip (alternative to the map when <2 plottable points) */
+.route-strip { padding: 20px; display: flex; align-items: center; gap: 0; overflow-x: auto; }
+.route-strip .stop { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 90px; }
+.route-strip .stop .pt { width: 11px; height: 11px; border-radius: 50%; background: var(--hi); border: 2px solid var(--bg); }
+.route-strip .stop.vantage .pt { background: var(--accent); box-shadow: 0 0 0 3px var(--acc-bg); }
+.route-strip .stop .nm { font-family: var(--disp); font-size: 12px; font-weight: 600; margin-top: 8px; }
+.route-strip .stop .sub { font-family: var(--mono); font-size: 10px; color: var(--lo); margin-top: 2px; }
+.route-strip .seg-line { flex: 1; min-width: 30px; height: 2px; background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 9px); margin: 0 4px; align-self: flex-start; margin-top: 5px; position: relative; }
+.route-strip .seg-line .lab { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 10px; color: var(--mid); white-space: nowrap; }
+
+/* hop ladder — data cells beyond the T15 base */
+table.hops td.asn b { color: var(--hi); font-weight: 500; font-family: var(--disp); }
+table.hops .city { display: inline-flex; align-items: center; gap: 6px; color: var(--mid); }
+table.hops .lat { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+table.hops .lat .bar { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent), #8fc0ff); flex: 0 0 auto; }
+table.hops .lat .ms { font-size: 11px; color: var(--mid); }
+table.hops tr.asn-group .cnt { font-size: 10px; color: var(--lo); margin-left: 8px; }
+.peer-tag { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: var(--acc-bg); padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+.edge-anchor { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-left: 8px; }
+
+/* segment narration */
+.seg-narrate { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+.segc { background: var(--panel); border: 1px solid var(--border); border-top: 2px solid var(--accent); border-radius: 10px; padding: 15px 16px; }
+.segc.access { border-top-color: var(--info); } .segc.transit { border-top-color: var(--mid); } .segc.cdn { border-top-color: var(--accent); }
+.segc .sh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.segc .sname { font-family: var(--disp); font-weight: 600; font-size: 13px; color: var(--hi); }
+.segc .srange { font-family: var(--mono); font-size: 10px; color: var(--lo); }
+.segc p { margin: 0 0 10px; font-size: 12.5px; color: var(--mid); line-height: 1.5; }
+.segc .corrob { font-family: var(--mono); font-size: 10.5px; color: var(--accent); background: var(--acc-bg); border: 1px solid rgba(91, 157, 240, .25); padding: 6px 9px; border-radius: 6px; display: flex; gap: 7px; align-items: flex-start; }
+.segc .corrob svg { width: 13px; height: 13px; stroke: var(--accent); fill: none; stroke-width: 2; flex: 0 0 auto; margin-top: 1px; }
+.segc.access .corrob, .segc.transit .corrob { color: var(--mid); background: var(--panel-2); border-color: var(--border-soft); }
+.segc.access .corrob svg, .segc.transit .corrob svg { stroke: var(--mid); }
+
+/* measurement seam — the signature joint shared by traceroute (above) and headers (below) */
+.route-seam { position: relative; margin-top: 24px; font-size: 12.5px; color: var(--mid); background: var(--panel); border: 1px solid rgba(91, 157, 240, .35); border-radius: 10px; display: flex; align-items: stretch; }
+.route-seam::before, .route-seam::after { content: ""; position: absolute; left: 50%; width: 2px; margin-left: -1px; }
+.route-seam::before { top: -24px; height: 24px; background: linear-gradient(180deg, transparent, var(--accent)); }
+.route-seam::after { bottom: -30px; height: 30px; background: linear-gradient(180deg, var(--accent), transparent); }
+.seam-glyph { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 14px 18px; background: var(--acc-bg); border-right: 1px dashed rgba(91, 157, 240, .4); border-radius: 10px 0 0 10px; text-align: center; }
+.seam-glyph .cap { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--lo); }
+.seam-glyph .ip { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent); }
+.route-seam .body { padding: 13px 16px; align-self: center; }
+
+@media (max-width: 880px) {
+  .verdict { grid-template-columns: 1fr 1fr; }
+  .route-grid { grid-template-columns: 1fr; }
+  .seg-narrate { grid-template-columns: 1fr; }
+  .route-seam { flex-direction: column; }
+  .seam-glyph { border-right: 0; border-bottom: 1px dashed rgba(91, 157, 240, .4); border-radius: 10px 10px 0 0; }
+}
+
 /* --- form controls (launch + advanced) --- */
 .btn { font-family: var(--body); font-size: 13px; color: var(--bg); background: var(--accent); border: 0; font-weight: 600; padding: 10px 16px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
 .btn:hover { filter: brightness(1.08); }
