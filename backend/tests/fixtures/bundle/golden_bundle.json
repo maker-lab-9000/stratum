@@ -1,0 +1,245 @@
+{
+  "meta": {
+    "url": "https://www.example-foods.com/",
+    "vantage": "Berlin, DE \u00b7 homelab",
+    "request_options": {
+      "request_count": 4,
+      "interval_ms": 250,
+      "warm": true
+    },
+    "gaps": []
+  },
+  "dns": {
+    "a": [
+      "23.55.1.1"
+    ],
+    "aaaa": [],
+    "cname_chain": [
+      {
+        "name": "www.example-foods.com",
+        "cname": "example-foods.com.edgekey.net",
+        "ttl": 300
+      },
+      {
+        "name": "example-foods.com.edgekey.net",
+        "cname": "e123.akamaiedge.net",
+        "ttl": 20
+      }
+    ],
+    "ns": [
+      "ns1.example-foods.com",
+      "ns2.example-foods.com"
+    ],
+    "ttl": 20,
+    "truncated": false
+  },
+  "samples": [
+    {
+      "request": 1,
+      "ok": true,
+      "status": 200,
+      "http_version": "HTTP/2",
+      "url": "https://www.example-foods.com/",
+      "headers": [
+        [
+          "Server",
+          "AkamaiGHost"
+        ],
+        [
+          "Via",
+          "1.1 v1-akamaitech.net"
+        ],
+        [
+          "X-Cache",
+          "TCP_MISS from a23-fra"
+        ],
+        [
+          "Age",
+          "0"
+        ],
+        [
+          "Cache-Control",
+          "no-cache, no-store"
+        ]
+      ],
+      "elapsed_ms": 41.0,
+      "started_at_ms": 0.0,
+      "error": null
+    },
+    {
+      "request": 2,
+      "ok": true,
+      "status": 200,
+      "http_version": "HTTP/2",
+      "url": "https://www.example-foods.com/",
+      "headers": [
+        [
+          "Server",
+          "AkamaiGHost"
+        ],
+        [
+          "Via",
+          "1.1 v1-akamaitech.net"
+        ],
+        [
+          "X-Cache",
+          "TCP_MISS from a23-fra"
+        ],
+        [
+          "Age",
+          "0"
+        ],
+        [
+          "Cache-Control",
+          "no-cache, no-store"
+        ]
+      ],
+      "elapsed_ms": 42.0,
+      "started_at_ms": 250.0,
+      "error": null
+    },
+    {
+      "request": 3,
+      "ok": true,
+      "status": 200,
+      "http_version": "HTTP/2",
+      "url": "https://www.example-foods.com/",
+      "headers": [
+        [
+          "Server",
+          "AkamaiGHost"
+        ],
+        [
+          "Via",
+          "1.1 v1-akamaitech.net"
+        ],
+        [
+          "X-Cache",
+          "TCP_MISS from a23-fra"
+        ],
+        [
+          "Age",
+          "0"
+        ],
+        [
+          "Cache-Control",
+          "no-cache, no-store"
+        ]
+      ],
+      "elapsed_ms": 43.0,
+      "started_at_ms": 500.0,
+      "error": null
+    },
+    {
+      "request": 4,
+      "ok": true,
+      "status": 200,
+      "http_version": "HTTP/2",
+      "url": "https://www.example-foods.com/",
+      "headers": [
+        [
+          "Server",
+          "AkamaiGHost"
+        ],
+        [
+          "Via",
+          "1.1 v1-akamaitech.net"
+        ],
+        [
+          "X-Cache",
+          "TCP_MISS from a23-fra"
+        ],
+        [
+          "Age",
+          "0"
+        ],
+        [
+          "Cache-Control",
+          "no-cache, no-store"
+        ]
+      ],
+      "elapsed_ms": 44.0,
+      "started_at_ms": 750.0,
+      "error": null
+    }
+  ],
+  "warm": {
+    "warmed": true,
+    "skipped": false,
+    "error": null,
+    "timing": {
+      "status": 200,
+      "final_url": "https://www.example-foods.com/",
+      "ttfb_ms": 45,
+      "load_ms": 210,
+      "dom_content_loaded_ms": 150,
+      "duration_ms": 210
+    }
+  },
+  "progression": {
+    "age_values": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "age_deltas": [
+      0,
+      0,
+      0
+    ],
+    "cache_control": [
+      "no-cache, no-store",
+      "no-cache, no-store",
+      "no-cache, no-store",
+      "no-cache, no-store"
+    ],
+    "status": [
+      200,
+      200,
+      200,
+      200
+    ],
+    "elapsed_ms": [
+      41.0,
+      42.0,
+      43.0,
+      44.0
+    ]
+  },
+  "traceroute": {
+    "tool": "mtr",
+    "target": "e123.akamaiedge.net",
+    "port": 443,
+    "timed_out": false,
+    "error": null,
+    "hops": [
+      {
+        "n": 1,
+        "ip": "192.168.1.1",
+        "rdns": null,
+        "asn": null,
+        "org": null,
+        "city": null,
+        "rtt_ms": 0.7,
+        "private": true,
+        "unresponsive": false,
+        "hint": null
+      },
+      {
+        "n": 2,
+        "ip": "23.55.1.1",
+        "rdns": "a23-55-1-1.deploy.static.akamaitechnologies.com",
+        "asn": 20940,
+        "org": "Akamai Technologies",
+        "city": "Frankfurt am Main",
+        "rtt_ms": 15.0,
+        "private": false,
+        "unresponsive": false,
+        "hint": "FRA/Frankfurt"
+      }
+    ],
+    "geo_available": true,
+    "enrichment_notes": []
+  }
+}
