@@ -1,12 +1,24 @@
 """FastAPI application entrypoint.
 
-T01 scaffold: only the health endpoint exists. Pipeline, persistence, and the
-analysis API land in later tasks (see stratum-action-plan.md).
+Scaffold state: health endpoint + create-on-boot DB init. The analysis API,
+pipeline, and streaming land in later tasks (see stratum-action-plan.md).
 """
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-app = FastAPI(title="Stratum", version="0.1.0")
+from app.db import get_engine, init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create-on-boot (spec §6): ensure the reports table exists before serving.
+    init_db(get_engine())
+    yield
+
+
+app = FastAPI(title="Stratum", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/api/health")
