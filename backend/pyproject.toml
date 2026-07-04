@@ -10,6 +10,7 @@ dependencies = [
     "dnspython>=2.7",
     "httpx[http2]>=0.28",
     "maxminddb>=2.6",
+    "playwright>=1.48",
 ]
 
 [dependency-groups]
