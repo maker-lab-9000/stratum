@@ -1,3 +1,139 @@
 @import "tailwindcss";
 
-/* Design tokens from cache-report-mockup.html are ported into the theme in T15. */
+/* ============================================================================
+   Design tokens — ported 1:1 from cache-report-mockup.html :root (the visual
+   source of truth). tokens.test.ts parses the mockup and asserts these match.
+   ========================================================================== */
+:root {
+  --bg: #0e1419; --panel: #151d25; --panel-2: #1a242d; --raise: #202c36;
+  --border: #26323d; --border-soft: #1f2932;
+  --hi: #e9eff4; --mid: #9aabb8; --lo: #6e8496;
+  --accent: #5b9df0; --hit: #54d98c; --miss: #f0b34a; --crit: #f4736b; --info: #6f8494;
+  --hit-bg: rgba(84, 217, 140, .12); --miss-bg: rgba(240, 179, 74, .12); --crit-bg: rgba(244, 115, 107, .12); --acc-bg: rgba(91, 157, 240, .12);
+  --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --disp: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Expose the tokens to Tailwind utilities (bg-bg, text-hi, font-mono, …). */
+@theme {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-raise: var(--raise);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-hi: var(--hi);
+  --color-mid: var(--mid);
+  --color-lo: var(--lo);
+  --color-accent: var(--accent);
+  --color-hit: var(--hit);
+  --color-miss: var(--miss);
+  --color-crit: var(--crit);
+  --color-info: var(--info);
+  --font-disp: var(--disp);
+  --font-mono: var(--mono);
+  --font-body: var(--body);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--hi);
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================================
+   PRIMITIVES — ported verbatim from the mockup. Shared components apply these
+   classes so every section renders from one system. Status-palette discipline:
+   green (--hit) is reserved for served-from-cache / HIT only.
+   ========================================================================== */
+
+/* --- Eyebrow --- */
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--lo); margin: 34px 0 12px; display: flex; align-items: center; gap: 10px; }
+.eyebrow::after { content: ""; height: 1px; flex: 1; background: var(--border-soft); }
+.eyebrow .step { color: var(--accent); font-weight: 700; }
+.eyebrow.sub { font-size: 10px; margin: 26px 0 10px; padding-left: 14px; border-left: 2px solid var(--border); }
+
+/* --- Tile + ConfBar --- */
+.tile { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 18px 16px; position: relative; overflow: hidden; }
+.tile .k { font-size: 11.5px; letter-spacing: .04em; color: var(--lo); text-transform: uppercase; }
+.tile .v { font-family: var(--disp); font-weight: 600; font-size: 24px; line-height: 1.15; margin-top: 10px; letter-spacing: -.3px; }
+.tile .v small { font-size: 14px; color: var(--mid); font-weight: 400; }
+.tile .foot { font-size: 12px; color: var(--mid); margin-top: 8px; }
+.tile .edge { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.tile.is-hit { border-color: rgba(84, 217, 140, .35); } .tile.is-hit .v { color: var(--hit); } .tile.is-hit .edge { background: var(--hit); }
+.tile.is-warn { border-color: rgba(240, 179, 74, .40); } .tile.is-warn .v { color: var(--miss); } .tile.is-warn .edge { background: var(--miss); }
+.tile.is-accent .edge { background: var(--accent); } .tile.is-accent .v { color: var(--hi); }
+.tile.is-unknown { border-color: rgba(95, 114, 128, .45); } .tile.is-unknown .v { color: var(--lo); } .tile.is-unknown .edge { background: var(--lo); }
+.conf-bar { height: 5px; border-radius: 3px; background: var(--raise); margin-top: 12px; overflow: hidden; }
+.conf-bar > i { display: block; height: 100%; width: 88%; background: linear-gradient(90deg, var(--accent), #8fc0ff); }
+.conf-row { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+.conf-row .conf-bar { flex: 1; margin-top: 0; }
+.conf-row .conf-lbl { font-family: var(--mono); font-size: 10px; color: var(--lo); white-space: nowrap; }
+
+/* --- Badge family: pill / badge / tag / sev / bhv / unverified --- */
+.pill { font-size: 11.5px; color: var(--mid); background: var(--panel); border: 1px solid var(--border); padding: 5px 9px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.pill b { color: var(--hi); font-weight: 500; }
+.badge { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--accent); background: var(--acc-bg); border: 1px solid rgba(91, 157, 240, .3); padding: 2px 7px; border-radius: 5px; letter-spacing: .04em; display: inline-block; }
+/* MISS is a raw per-request state, not a warning — neutral by default; amber marks only the anomaly under discussion */
+.tag { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: .04em; padding: 2px 7px; border-radius: 5px; display: inline-block; }
+.tag.hit { color: var(--bg); background: var(--hit); } .tag.miss { color: var(--mid); background: rgba(154, 171, 184, .14); }
+.tag.unknown { color: var(--lo); background: transparent; border: 1px dashed var(--lo); }
+.sev { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; display: inline-block; }
+.sev.crit { color: var(--crit); background: var(--crit-bg); } .sev.warn { color: var(--miss); background: var(--miss-bg); } .sev.info { color: var(--info); background: rgba(111, 132, 148, .14); }
+.bhv { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: .04em; padding: 3px 9px; border-radius: 5px; white-space: nowrap; display: inline-block; }
+.bhv.served { color: var(--bg); background: var(--hit); } .bhv.pass { color: var(--miss); background: var(--miss-bg); } .bhv.none { color: var(--lo); background: rgba(95, 114, 128, .14); } .bhv.init { color: var(--accent); background: var(--acc-bg); }
+/* FORWARDS: a non-caching layer (WAF, load balancer) doing its job — neutral, not a miss */
+.bhv.fwd { color: var(--mid); background: rgba(154, 171, 184, .14); }
+.bhv.unknown { color: var(--lo); background: transparent; border: 1px dashed var(--lo); }
+/* SERVED FROM ORIGIN: nothing cached — accent blue, never green */
+.bhv.origin-serve { color: var(--bg); background: var(--accent); }
+.unverified { font-family: var(--mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--miss); background: var(--miss-bg); border: 1px dashed rgba(240, 179, 74, .5); padding: 1px 5px; border-radius: 4px; margin-left: 6px; vertical-align: middle; display: inline-block; }
+
+/* --- Card (findings) --- */
+.card { background: var(--panel); border: 1px solid var(--border); border-left-width: 3px; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.card.crit { border-left-color: var(--crit); } .card.warn { border-left-color: var(--miss); } .card.info { border-left-color: var(--info); }
+.card .row1 { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+.card .ttl { font-weight: 600; font-size: 13.5px; color: var(--hi); }
+.card p { margin: 0 0 9px; color: var(--mid); font-size: 12.5px; line-height: 1.55; }
+.card code { font-family: var(--mono); font-size: 11.5px; color: var(--hi); background: var(--panel-2); border: 1px solid var(--border-soft); padding: 6px 9px; border-radius: 6px; display: block; white-space: pre-wrap; word-break: break-all; }
+.card .hdr-lbl { font-family: var(--mono); font-size: 10px; color: var(--lo); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 4px; }
+
+/* --- DegradedBanner --- */
+.degraded { margin-top: 22px; display: flex; gap: 10px; align-items: flex-start; background: var(--miss-bg); border: 1px solid rgba(240, 179, 74, .4); border-radius: 10px; padding: 13px 16px; font-size: 12.5px; color: var(--mid); }
+.degraded b { color: var(--miss); }
+
+/* --- Table (one component; hops / layers / prog variants) --- */
+.tbl-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; overflow-x: auto; }
+table.hops, table.layers, table.prog { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.hops { min-width: 680px; } table.layers { min-width: 640px; } table.prog { min-width: 560px; }
+table.hops th, table.hops td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+table.layers th, table.layers td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+table.prog th, table.prog td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border-soft); }
+table.hops thead th, table.layers thead th, table.prog thead th { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--lo); font-weight: 500; background: var(--panel-2); }
+table.hops td { font-family: var(--mono); font-size: 12px; color: var(--mid); }
+table.hops td.n { color: var(--lo); width: 34px; } table.hops td.host { color: var(--hi); }
+table.hops tr.private td { opacity: .55; }
+table.hops tr.edge-row td { background: rgba(91, 157, 240, .07); } table.hops tr.edge-row td.host { color: var(--accent); }
+table.hops tr.timeout td { color: var(--lo); font-style: italic; }
+table.hops tr.asn-group td { background: var(--panel-2); cursor: pointer; }
+table.hops tr:last-child td, table.layers tr:last-child td, table.prog tr:last-child td { border-bottom: 0; }
+table.layers tbody td { color: var(--mid); }
+table.layers tbody td.layer { font-family: var(--disp); font-weight: 500; color: var(--hi); white-space: nowrap; }
+table.layers tbody td.ev code { font-family: var(--mono); font-size: 11px; color: var(--hi); background: var(--panel-2); border: 1px solid var(--border-soft); padding: 3px 7px; border-radius: 5px; white-space: nowrap; }
+table.layers tr.row-served td { background: rgba(84, 217, 140, .05); }
+table.prog tbody th { font-family: var(--mono); font-size: 12px; color: var(--mid); font-weight: 500; width: 200px; background: var(--panel); text-align: left; }
+table.prog td { font-family: var(--mono); font-size: 12px; color: var(--hi); }
+table.prog tr.served-row th { color: var(--hit); }
+
+/* header progression at N>6: per-signal state strip */
+.strip { display: inline-flex; gap: 2px; vertical-align: middle; }
+.strip i { width: 13px; height: 13px; border-radius: 3px; background: var(--raise); }
+.strip i.h { background: var(--hit); } .strip i.m { background: var(--miss); } .strip i.u { background: transparent; border: 1px dashed var(--lo); box-sizing: border-box; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
