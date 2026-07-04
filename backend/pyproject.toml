@@ -8,13 +8,13 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "sqlalchemy>=2.0",
     "dnspython>=2.7",
+    "httpx[http2]>=0.28",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
-    "httpx>=0.28",
     "respx>=0.22",
     "psycopg[binary]>=3.2",
 ]
