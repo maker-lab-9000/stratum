@@ -110,6 +110,14 @@ class DefaultSubprocessRunner:
                 proc.returncode,
                 timed_out=True,
             )
+        except asyncio.CancelledError:
+            # Pipeline cancellation must not leave an orphan traceroute (T09 §6).
+            proc.kill()
+            try:
+                await proc.wait()
+            except Exception:
+                pass
+            raise
 
 
 # --- public entrypoint --------------------------------------------------------
