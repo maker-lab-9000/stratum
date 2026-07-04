@@ -20,12 +20,14 @@ function renderReport(report: Report) {
 // --- Scenario 1: akamai_bypass fixture renders Section-01 content -------------
 
 test("akamai_bypass report renders verdict + all Section-01 content", () => {
-  renderReport(akamaiReport);
+  const { container } = renderReport(akamaiReport);
 
-  // Verdict tiles, user->origin order.
-  expect(screen.getByText("Bypassed")).toBeInTheDocument();
-  expect(screen.getByText("Apache Dispatcher")).toBeInTheDocument();
-  expect(screen.getByText("Akamai")).toBeInTheDocument();
+  // Verdict tiles, user->origin order (scoped: "Apache Dispatcher"/"Akamai" also
+  // appear once Section 02's chain + layer table render).
+  const tiles = container.querySelector(".verdict") as HTMLElement;
+  expect(within(tiles).getByText("Bypassed")).toBeInTheDocument();
+  expect(within(tiles).getByText("Apache Dispatcher")).toBeInTheDocument();
+  expect(within(tiles).getByText("Akamai")).toBeInTheDocument();
 
   // DNS panel: CDN detected + data-driven signature label.
   expect(screen.getByText("CDN detected")).toBeInTheDocument();
@@ -35,9 +37,11 @@ test("akamai_bypass report renders verdict + all Section-01 content", () => {
   // Geomap (Berlin -> Frankfurt both resolvable) rather than the strip fallback.
   expect(screen.getByTestId("geomap")).toBeInTheDocument();
 
-  // Hop ladder (a middle hop + the edge anchor).
-  expect(screen.getByText("62.155.241.18")).toBeInTheDocument();
-  expect(screen.getByText(/Akamai Edge/)).toBeInTheDocument();
+  // Hop ladder (a middle hop + the edge anchor); scoped to the hops table since
+  // "Akamai Edge" is also a Section 02 layer name.
+  const hops = container.querySelector("table.hops") as HTMLElement;
+  expect(within(hops).getByText("62.155.241.18")).toBeInTheDocument();
+  expect(within(hops).getByText(/Akamai Edge/)).toBeInTheDocument();
 
   // Segment narration + measurement seam (edge IP appears in DNS, hop, and seam).
   expect(screen.getByText("Access")).toBeInTheDocument();

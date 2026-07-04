@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { getReport, rerunAnalysis, type Report } from "../../api/client";
 import { Badge } from "../../components";
 import { Section01 } from "./Section01";
+import { Section02 } from "./Section02";
 import { VerdictTiles } from "./VerdictTiles";
 
 // The report centerpiece. Loads by id (or renders an injected report, used by the
@@ -91,8 +92,7 @@ export function ReportView({ report: injected }: ReportViewProps) {
       <main className="wrap">
         <VerdictTiles report={report} onRerun={onRerun} />
         <Section01 report={report} />
-
-        {/* Section 02 (serving layer + findings + raw drawer) lands in T19. */}
+        <Section02 report={report} />
 
         <p className="footnote">
           Measurements (DNS, headers, traceroute) are ground-truth facts. The verdict is
