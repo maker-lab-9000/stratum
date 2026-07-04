@@ -3,8 +3,9 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ComponentsGallery } from "./dev/Components";
 import { akamaiReport } from "./fixtures/akamaiReport";
 import { Launch } from "./views/Launch";
+import { LiveRun } from "./views/LiveRun";
 import { ReportView } from "./views/report/ReportView";
-import { History, LiveRun } from "./views/stubs";
+import { History } from "./views/stubs";
 
 export default function App() {
   return (

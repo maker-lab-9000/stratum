@@ -370,5 +370,37 @@ pre.raw .hk { color: var(--accent); } pre.raw .hv { color: var(--hi); }
 .disclosure summary::-webkit-details-marker { display: none; }
 .disclosure .chev { transition: transform .2s ease; } .disclosure[open] .chev { transform: rotate(90deg); }
 
+/* ============================================================================
+   LIVE RUN — horizontal stepper + evidence-as-it-lands panels (§8.1.2). No
+   mockup exists for this view; it uses the mockup's tokens/vocabulary. Green is
+   reserved for HIT/served, so a completed step is accent-blue, never green.
+   ========================================================================== */
+.stepper { list-style: none; margin: 18px 0 8px; padding: 8px 2px 14px; display: flex; align-items: flex-start; gap: 0; overflow-x: auto; }
+.stp { flex: 1; min-width: 92px; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 9px; padding: 0 4px; }
+/* connector line from the previous step's dot into this one */
+.stp::before { content: ""; position: absolute; top: 12px; left: -50%; width: 100%; height: 2px; background: var(--border); z-index: 0; }
+.stp:first-child::before { display: none; }
+.stp-dot { position: relative; z-index: 1; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--border); background: var(--panel-2); color: var(--lo); font-family: var(--mono); font-size: 12px; font-weight: 700; }
+.stp-label { font-family: var(--mono); font-size: 11px; letter-spacing: .03em; color: var(--lo); white-space: nowrap; }
+.stp.is-active .stp-dot { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 4px var(--acc-bg); animation: stp-pulse 1.4s ease-in-out infinite; }
+.stp.is-active .stp-label { color: var(--hi); }
+.stp.is-done .stp-dot { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+.stp.is-done::before { background: var(--accent); }
+.stp.is-done .stp-label { color: var(--mid); }
+.stp.is-failed .stp-dot { border-color: var(--miss); background: var(--miss-bg); color: var(--miss); }
+.stp.is-failed .stp-label { color: var(--miss); }
+@keyframes stp-pulse { 0%, 100% { box-shadow: 0 0 0 4px var(--acc-bg); } 50% { box-shadow: 0 0 0 7px rgba(91, 157, 240, .06); } }
+
+.live-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.live-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; overflow: hidden; }
+.live-panel pre.raw { margin-top: 4px; }
+.live-hops { list-style: none; margin: 6px 0 0; padding: 0; font-family: var(--mono); font-size: 12px; }
+.live-hops li { display: flex; gap: 12px; padding: 3px 0; color: var(--mid); }
+.live-hops .hn { color: var(--lo); width: 22px; text-align: right; flex: 0 0 auto; }
+.live-hops .hip { color: var(--hi); flex: 0 0 auto; min-width: 130px; }
+.live-hops .horg { color: var(--lo); }
+.live-note { font-size: 12.5px; color: var(--mid); margin-top: 16px; }
+@media (max-width: 880px) { .live-grid { grid-template-columns: 1fr; } }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }

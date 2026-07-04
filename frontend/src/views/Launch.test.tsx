@@ -55,7 +55,7 @@ test("valid URL + defaults -> exact POST body + navigates to live run", async ()
       geo_hint: null,
     },
   });
-  expect(navigateMock).toHaveBeenCalledWith("/runs/rep-123");
+  expect(navigateMock).toHaveBeenCalledWith("/runs/rep-123", { state: { requestCount: 4 } });
 });
 
 // --- Scenario 2 ---------------------------------------------------------------

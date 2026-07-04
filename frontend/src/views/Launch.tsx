@@ -97,7 +97,9 @@ export function Launch() {
     setSubmitting(true);
     try {
       const { id } = await createAnalysis(body);
-      navigate(`/runs/${id}`);
+      // Pass the request count so the live-run stepper can render the N request
+      // steps immediately, before the sample event reveals N.
+      navigate(`/runs/${id}`, { state: { requestCount: body.options.request_count } });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to start analysis");
       setSubmitting(false);

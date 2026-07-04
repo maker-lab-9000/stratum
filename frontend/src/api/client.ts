@@ -78,3 +78,96 @@ export async function rerunAnalysis(id: string): Promise<{ id: string }> {
 export function streamUrl(id: string): string {
   return `/api/analyses/${id}/stream`;
 }
+
+/** One progress event off the SSE stream (backend orchestrator, §3). */
+export interface StreamEvent {
+  stage: string;
+  status?: string;
+  terminal?: boolean;
+  degraded?: boolean;
+  data?: unknown;
+  error?: string;
+  gaps?: unknown;
+  report?: Report;
+  seq?: number;
+  ts?: number;
+}
+
+export interface StreamHandlers {
+  onEvent: (event: StreamEvent) => void;
+  /** Called when a connection drops before a terminal event; a reconnect follows. */
+  onError?: (err: unknown) => void;
+}
+
+interface SubscribeOptions {
+  reconnectDelayMs?: number;
+}
+
+// Consume the analysis SSE stream via fetch + ReadableStream (works behind the
+// dev proxy and is straightforward to mock). On a drop before the terminal
+// event it reconnects; the backend replays buffered history on re-subscribe, so
+// the caller's reducer recovers full state (must be idempotent per event).
+// Returns a closer that aborts the connection and stops reconnecting.
+export function subscribeAnalysis(
+  id: string,
+  handlers: StreamHandlers,
+  options: SubscribeOptions = {},
+): () => void {
+  const reconnectDelayMs = options.reconnectDelayMs ?? 800;
+  let closed = false;
+  let controller: AbortController | null = null;
+
+  async function run() {
+    while (!closed) {
+      controller = new AbortController();
+      let sawTerminal = false;
+      try {
+        const res = await fetch(streamUrl(id), {
+          headers: { accept: "text/event-stream" },
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let sep: number;
+          while ((sep = buf.indexOf("\n\n")) >= 0) {
+            const frame = buf.slice(0, sep);
+            buf = buf.slice(sep + 2);
+            const line = frame.split("\n").find((l) => l.startsWith("data:"));
+            if (!line) continue;
+            const payload = line.slice(5).trim();
+            if (!payload) continue;
+            let event: StreamEvent;
+            try {
+              event = JSON.parse(payload) as StreamEvent;
+            } catch {
+              continue;
+            }
+            if (closed) return;
+            handlers.onEvent(event);
+            if (event.terminal) sawTerminal = true;
+          }
+        }
+      } catch {
+        if (closed) return;
+      }
+      if (sawTerminal || closed) return;
+      // Dropped before the terminal event (network error or a clean close mid-run):
+      // signal it, back off, then reconnect. The backend replays buffered history
+      // on re-subscribe, so an idempotent reducer recovers full state.
+      handlers.onError?.(new Error("stream dropped"));
+      await new Promise((r) => setTimeout(r, reconnectDelayMs));
+    }
+  }
+
+  void run();
+  return () => {
+    closed = true;
+    controller?.abort();
+  };
+}
