@@ -71,6 +71,27 @@ export async function getReport(id: string): Promise<Report> {
   return json(await fetch(`/api/analyses/${id}`));
 }
 
+export interface ListFilters {
+  domain?: string | null;
+  hasCritical?: boolean;
+}
+
+/** GET /api/analyses with optional domain + has-critical filters (§7 history). */
+export async function listAnalyses(filters: ListFilters = {}): Promise<{ reports: Report[] }> {
+  const params = new URLSearchParams();
+  if (filters.domain) params.set("domain", filters.domain);
+  if (filters.hasCritical) params.set("has_critical", "true");
+  const qs = params.toString();
+  return json(await fetch(`/api/analyses${qs ? `?${qs}` : ""}`));
+}
+
+export async function deleteAnalysis(id: string): Promise<void> {
+  const res = await fetch(`/api/analyses/${id}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
+}
+
 export async function rerunAnalysis(id: string): Promise<{ id: string }> {
   return json(await fetch(`/api/analyses/${id}/rerun`, { method: "POST" }));
 }
