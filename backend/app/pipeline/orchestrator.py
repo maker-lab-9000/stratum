@@ -37,6 +37,7 @@ from app.collectors.enrichment import (
 from app.collectors.http_sampler import sample_requests
 from app.collectors.traceroute import run_traceroute
 from app.collectors.warmer import warm_cache
+from app.config import default_interval_ms, default_request_count
 from app.pipeline.bundle import assemble_bundle
 
 
@@ -76,8 +77,8 @@ def default_deps(
     async def _sample(url: str, options: dict) -> list:
         return await sample_requests(
             url,
-            request_count=options.get("request_count", 4),
-            interval_ms=options.get("interval_ms", 0),
+            request_count=options.get("request_count", default_request_count()),
+            interval_ms=options.get("interval_ms", default_interval_ms()),
             extra_request_headers=options.get("extra_request_headers"),
             timeout_ms=sample_timeout_ms,
         )

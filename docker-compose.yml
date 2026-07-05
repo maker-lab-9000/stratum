@@ -1,19 +1,51 @@
-# Stratum — Docker Compose (STUB, T01).
+# Stratum — Docker Compose (spec §9). Single-origin: the `api` service serves the
+# built frontend and the REST/SSE API on one port.
 #
-# This is a scaffold placeholder. The full deployment — Playwright base image,
-# tcptraceroute install, single-origin static serving, MaxMind download, and the
-# optional Postgres service — is built in T21 (spec §9).
-#
-# KEY INFRA CONSTRAINT (spec §9): the `api` service runs TCP traceroute and
-# therefore needs the NET_RAW (and likely NET_ADMIN) capability, or host
-# networking. This is wired and documented properly in T21.
+# ── KEY INFRA CONSTRAINT ─────────────────────────────────────────────────────
+# The `api` service runs TCP traceroute (mtr / tcptraceroute), which needs
+# raw-socket privileges. Grant NET_RAW (and NET_ADMIN, which some kernels also
+# require) via `cap_add` below, or run with host networking. Without them the
+# analysis still completes — the traceroute stage surfaces a typed error and the
+# report renders with an empty route (never a crash) — but you get no hop data.
 
 services:
   api:
-    build: ./backend
-    # cap_add: [NET_RAW, NET_ADMIN]   # required for traceroute — enabled in T21
+    build:
+      context: .
+      # amd64 is the deployment target; uncomment to force it on arm hosts.
+      # platforms: ["linux/amd64"]
+    image: stratum-api
     ports:
       - "8000:8000"
     env_file:
       - .env
-    # volumes / db / frontend static serving added in T21.
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      # Persists the SQLite DB, downloaded GeoLite2 databases, and any run data.
+      - stratum-data:/app/backend/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # Optional Postgres. Enable with:  docker compose --profile postgres up
+  # then set DATABASE_URL=postgresql+psycopg://stratum:stratum@db:5432/stratum
+  db:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: stratum
+      POSTGRES_PASSWORD: stratum
+      POSTGRES_DB: stratum
+    volumes:
+      - stratum-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  stratum-data:
+  stratum-pgdata:

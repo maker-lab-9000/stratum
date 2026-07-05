@@ -9,8 +9,9 @@ verbatim and never interprets it; the LLM produces the entire verdict and every
 claim cites evidence that the backend machine-checks for existence. See the
 requirements spec for the full contract.
 
-> **Status:** early build. This is the T01 scaffold — health endpoint + wired
-> test/build tooling on both sides. Features land task-by-task (T02…T24).
+> **Status:** active build. The full launch → live-run → report → history flow
+> works end-to-end, and a single-origin Docker image ships the whole app.
+> Remaining polish lands task-by-task (security gate, a11y pass, e2e suite).
 
 ## Stack
 
@@ -45,13 +46,50 @@ Health check:
 curl http://localhost:8000/api/health   # -> {"status":"ok"}
 ```
 
+## Deploy with Docker (single origin)
+
+The `Dockerfile` builds the frontend and bakes it into the api image, so one
+container serves the UI, the REST/SSE API, and the pipeline. Target host is
+**amd64** (Proxmox / Docker homelab).
+
+```bash
+cp .env.example .env          # fill in LLM key(s), MAXMIND_LICENSE_KEY, VANTAGE_LABEL
+docker compose up -d --build  # UI + API on http://localhost:8000
+curl http://localhost:8000/api/health   # -> {"status":"ok"}
+```
+
+Data (SQLite DB + downloaded GeoLite2 databases) persists on the `stratum-data`
+volume, so history survives `docker compose restart`.
+
+> **⚠ Traceroute needs raw-socket privileges.** The compose file grants the api
+> `NET_RAW` + `NET_ADMIN` (`cap_add`). Without them the app still runs and
+> analyses still complete — the traceroute stage records a typed error and the
+> report renders with an empty route — but you get no hop/geo data. On hosts
+> that forbid `cap_add`, use host networking instead.
+
+Building on a non-amd64 machine? `docker compose build` with
+`platforms: ["linux/amd64"]` uncommented in `docker-compose.yml`, or
+`docker build --platform linux/amd64 -t stratum-api .`.
+
+**Optional Postgres** instead of SQLite:
+
+```bash
+# in .env: DATABASE_URL=postgresql+psycopg://stratum:stratum@db:5432/stratum
+docker compose --profile postgres up -d --build
+```
+
+**No LLM keys?** The app still boots and serves the UI; the launch view shows an
+empty model list and reports render in the degraded (verdict-unavailable) state.
+
 ## Layout
 
 ```
 backend/     FastAPI app + pipeline + tests (uv project)
 frontend/    Vite + React + TS + Tailwind + vitest
-docker-compose.yml   deployment stub (fleshed out in T21)
-Makefile     install / test / dev entrypoints
+Dockerfile   single-origin image (frontend build + api)
+docker-compose.yml   api (+ optional Postgres), volume, capabilities
+.env.example live-config template (copy to .env)
+Makefile     install / test / dev / docker entrypoints
 ```
 
 ## Testing
@@ -67,6 +105,23 @@ tests are marked `@pytest.mark.live` and excluded from the default run.
 
 ## Configuration
 
-Secrets come from the environment only, never the DB or API responses. The full
-env var matrix (LLM keys, MaxMind, vantage label, auth) is documented alongside
-the Docker deployment in T21. A `.env.example` ships then.
+Secrets come from the environment only — never the DB, API responses, or logs.
+Copy `.env.example` to `.env` and fill in what you need (all optional except a
+provider key, which the verdict requires):
+
+| Var | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic provider (verdict) |
+| `OPENROUTER_API_KEY` | OpenRouter provider (verdict) |
+| `MAXMIND_LICENSE_KEY` | Download GeoLite2 ASN/City on boot; unset → ASN/geo `unknown` |
+| `MAXMIND_DB_DIR` | Where the `.mmdb` files live (default under the data volume) |
+| `VANTAGE_LABEL` | Disclosed on every report's map (where the runner sits) |
+| `DEFAULT_REQUEST_COUNT` / `DEFAULT_INTERVAL_MS` | Sampling defaults |
+| `DATABASE_URL` | SQLite path (default) or a Postgres DSN |
+| `PIPELINE_CONCURRENCY` / `LOG_LEVEL` | Pipeline workers / log verbosity |
+| `AUTH_ENABLED` / `BASIC_AUTH_USER` / `BASIC_AUTH_PASS` | Optional access gate (see T22) |
+
+`GET /api/models` returns model ids for the configured providers — never keys.
+
+> **Do not expose Stratum publicly without the auth gate.** It makes outbound
+> requests to operator-supplied URLs and is built for trusted LAN / homelab use.

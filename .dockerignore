@@ -1,0 +1,28 @@
+# Build context hygiene — keep the image small and cache-friendly.
+**/.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/*.tsbuildinfo
+
+# Local data + secrets never belong in the image.
+**/data
+.env
+.env.*
+!.env.example
+
+# Operator/spec docs (kept local)
+cache-report-mockup.html
+CLAUDE.md
+progress.md
+stratum-action-plan.md
+stratum-requirements.md
+
+# VCS / editor / OS
+.git
+.gitignore
+.DS_Store

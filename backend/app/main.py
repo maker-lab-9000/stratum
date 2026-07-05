@@ -8,22 +8,30 @@ or the LLM fails.
 
 from __future__ import annotations
 
+import logging
 import os
 
 from app.api.factory import create_app
 from app.db import get_engine, get_repository, init_db
+from app.geoip import build_geo_provider
 from app.pipeline.analyze import make_llm_analyze
 from app.pipeline.manager import PipelineManager
 from app.pipeline.orchestrator import default_deps
 
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+
 # Create-on-boot (spec §6).
 init_db(get_engine())
+
+# Offline ASN/geo enrichment: MaxMind when available, else degrades to "unknown"
+# (build_geo_provider never raises — a geo failure must not stop boot).
+_geo = build_geo_provider()
 
 _repo = get_repository()
 _manager = PipelineManager(
     _repo,
     concurrency=int(os.getenv("PIPELINE_CONCURRENCY", "2")),
-    deps=default_deps(analyze=make_llm_analyze()),
+    deps=default_deps(analyze=make_llm_analyze(), geo=_geo),
     vantage=os.getenv("VANTAGE_LABEL", "unknown vantage"),
 )
 

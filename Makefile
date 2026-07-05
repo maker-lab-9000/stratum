@@ -1,7 +1,8 @@
 # Stratum — developer entrypoints. One CI-runnable test command per side (T01).
 .PHONY: install install-backend install-frontend \
         test test-backend test-frontend \
-        dev-backend dev-frontend build-frontend clean
+        dev-backend dev-frontend build-frontend clean \
+        docker-build docker-up docker-down
 
 install: install-backend install-frontend ## Install both sides
 
@@ -29,6 +30,16 @@ dev-frontend:
 
 build-frontend:
 	cd frontend && npm run build
+
+## --- Docker (single-origin deployment, spec §9) --------------------------
+docker-build:
+	docker compose build
+
+docker-up: ## Build + run the api (UI + API on :8000). Needs a .env (see .env.example).
+	docker compose up -d --build
+
+docker-down:
+	docker compose down
 
 clean:
 	rm -rf backend/.venv backend/.pytest_cache frontend/node_modules frontend/dist
