@@ -197,6 +197,47 @@ test("an injection probe in a header value renders as text, never as markup", ()
   expect(screen.getAllByText((_, el) => el?.textContent?.includes(probe) ?? false).length).toBeGreaterThan(0);
 });
 
+// --- Scenario 6 (extended): script tags, ANSI, and a 10KB value stay inert ---
+
+test("malicious header values (script/ANSI/10KB) render as text, UI intact", () => {
+  const script = "<script>window.__pwned=1</script>";
+  const ansi = "[31mRED[0m payload";
+  const huge = "B".repeat(10_240);
+  const malicious: Report = {
+    ...akamaiReport,
+    samples_json: [
+      {
+        request: 1,
+        http_version: "HTTP/2",
+        status: 200,
+        headers: [
+          ["x-xss", script],
+          ["x-ansi", ansi],
+          ["x-huge", huge],
+        ],
+      },
+    ] as unknown as Report["samples_json"],
+    verdict_json: {
+      ...(akamaiReport.verdict_json as object),
+      layers: [layer({ layer_name: "Proxy", state: "HIT", evidence_headers: [`x-xss: ${script}`] })],
+      serving_layer: "Proxy",
+      validation: { ok: true, flags: [] },
+    } as unknown as Report["verdict_json"],
+  };
+
+  const { container } = render(<Section02 report={malicious} />);
+
+  // No live nodes were ever created from the payload, and nothing executed.
+  expect(container.querySelector("script")).toBeNull();
+  expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
+  // The raw drawer shows the values as inert text (React-escaped).
+  const raw = screen.getByTestId("raw-body");
+  expect(raw.textContent).toContain(script);
+  expect(raw.textContent).toContain(ansi);
+  // The 10KB value renders in full without breaking the layout (text node present).
+  expect(raw.textContent).toContain(huge);
+});
+
 test("RawDrawer switches to a <select> beyond 8 requests", () => {
   render(<RawDrawer samples={samples(10)} />);
   expect(screen.getByLabelText("Select request")).toBeInTheDocument();

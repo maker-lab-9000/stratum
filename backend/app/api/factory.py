@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from app.api.routes import router
+from app.security import add_basic_auth
 
 
 def create_app(repo, manager, *, serve_static: bool = True) -> FastAPI:
@@ -20,6 +21,9 @@ def create_app(repo, manager, *, serve_static: bool = True) -> FastAPI:
     app.include_router(router)
     if serve_static:
         _mount_static(app)
+    # Optional basic-auth gate (env-driven, off by default; §10). Added last so
+    # it wraps the router + static mount alike.
+    add_basic_auth(app)
     return app
 
 

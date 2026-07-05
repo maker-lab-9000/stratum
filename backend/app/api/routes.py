@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.schemas import CreateAnalysisRequest, CreateAnalysisResponse
 from app.llm.registry import available_models
+from app.security import outbound_rejection_reason
 
 router = APIRouter(prefix="/api")
 
@@ -33,6 +34,11 @@ async def get_models() -> dict:
 async def create_analysis(body: CreateAnalysisRequest, request: Request) -> CreateAnalysisResponse:
     repo = request.app.state.repo
     manager = request.app.state.manager
+
+    # Optional outbound allowlist (§10): reject off-list targets before enqueueing.
+    reason = outbound_rejection_reason(body.url)
+    if reason:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
 
     report = repo.create(
         url=body.url,
@@ -58,6 +64,10 @@ async def rerun_analysis(report_id: str, request: Request) -> CreateAnalysisResp
     original = repo.get(report_id)
     if original is None:
         raise HTTPException(status_code=404, detail="report not found")
+
+    reason = outbound_rejection_reason(original.url)
+    if reason:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
 
     new_report = repo.create(
         url=original.url, provider=original.provider, model=original.model,

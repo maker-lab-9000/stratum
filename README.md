@@ -125,3 +125,17 @@ provider key, which the verdict requires):
 
 > **Do not expose Stratum publicly without the auth gate.** It makes outbound
 > requests to operator-supplied URLs and is built for trusted LAN / homelab use.
+
+## Security (§10)
+
+All controls are env-driven and **off by default** (trusted-LAN posture). Each
+checklist line maps to a control and a test:
+
+| §10 requirement | Control | Test |
+|---|---|---|
+| Optional auth gate | `AUTH_ENABLED` + `BASIC_AUTH_USER/PASS` → HTTP Basic on every route (health exempt) | `test_security::test_auth_gate_blocks_without_credentials` |
+| Optional outbound allowlist | `OUTBOUND_ALLOWLIST` host patterns; off-list targets 400 at POST | `test_security::test_allowlist_rejects_offlist_target_at_post` |
+| Private-range targets | Allowed by default (LAN tool) and disclosed via the route, never silently public | `test_security::test_private_target_detection` |
+| No secret reflection | Analysed-site headers/HTML stored verbatim, rendered as React text nodes (never `eval`/`dangerouslySetInnerHTML`) | `test_security::test_malicious_headers_are_stored_raw`, `Section02.test::malicious header values … render as text` |
+| Secrets from env only | LLM keys read from env; absent from DB rows, API responses, logs; `GET /api/models` returns ids only | `test_security::test_llm_key_never_appears_in_responses_or_db` |
+| Vantage disclosed | Every report payload carries `vantage` | `test_security::test_every_report_payload_discloses_vantage` |
