@@ -176,3 +176,27 @@ async def test_models_empty_when_no_keys(client, monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     resp = await client.get("/api/models")
     assert resp.json()["providers"] == []
+
+
+# --- T24: SPA fallback for the single-origin static mount ---------------------
+
+async def test_spa_fallback_serves_index_for_client_routes(tmp_path):
+    from fastapi import FastAPI
+
+    from app.api.factory import _SPAStaticFiles
+
+    (tmp_path / "index.html").write_text("<!doctype html><title>APP</title>")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "app.js").write_text("console.log('x')")
+
+    app = FastAPI()
+    app.mount("/", _SPAStaticFiles(directory=str(tmp_path), html=True), name="static")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        # Real asset served normally.
+        assert (await c.get("/assets/app.js")).status_code == 200
+        # Client-side routes (deep link / refresh) fall back to index.html.
+        for path in ("/history", "/reports/abc123", "/runs/xyz"):
+            resp = await c.get(path)
+            assert resp.status_code == 200
+            assert "APP" in resp.text

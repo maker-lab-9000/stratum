@@ -165,3 +165,21 @@ def test_roundtrip_and_filters_on_postgres(pg_repo):
     assert pg_repo.get(a.id).has_critical is True
     assert {r.id for r in pg_repo.list(has_critical=True)} == {a.id}
     assert pg_repo.delete(a.id) is True
+
+
+def test_fail_unfinished_marks_running_and_queued(repo):
+    # Two in-flight rows + one already done.
+    a = repo.create(url="https://a.test/")
+    b = repo.create(url="https://b.test/")
+    c = repo.create(url="https://c.test/")
+    repo.update(a.id, status="running")
+    repo.update(b.id, status="queued")
+    repo.update(c.id, status="done")
+
+    n = repo.fail_unfinished(reason="interrupted by restart")
+    assert n == 2
+    assert repo.get(a.id).status == "error" and repo.get(a.id).error == "interrupted by restart"
+    assert repo.get(b.id).status == "error"
+    assert repo.get(c.id).status == "done"  # untouched
+    # Idempotent: nothing left to reconcile.
+    assert repo.fail_unfinished() == 0

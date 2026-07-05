@@ -1,0 +1,38 @@
+# End-to-end stack (T24): the real api (single-origin UI + pipeline) with the
+# keyless `fake` LLM, plus a controlled target site. Playwright runs from the
+# host against http://localhost:8000 and drives full flows; the api samples the
+# `target` service over the compose network. No API keys required.
+#
+#   docker compose -f docker-compose.e2e.yml up -d --build
+#   (cd frontend && npm run test:e2e:stack)
+#   docker compose -f docker-compose.e2e.yml down -v
+#
+# Or just `make e2e`, which orchestrates all of the above.
+
+services:
+  target:
+    build: ./e2e/target
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+    image: stratum-api
+    environment:
+      LLM_PROVIDER: fake          # keyless, deterministic recorded verdicts
+      VANTAGE_LABEL: "e2e vantage"
+      DATABASE_URL: "sqlite:////app/backend/data/stratum.db"
+      TRACEROUTE_TIMEOUT_S: "8"   # target is one internal hop; keep runs snappy
+    ports:
+      - "8000:8000"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    depends_on:
+      - target
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 20s

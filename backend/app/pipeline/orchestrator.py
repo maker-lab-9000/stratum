@@ -25,6 +25,7 @@ fakes; ``default_deps()`` wires the real collectors.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -63,7 +64,7 @@ def default_deps(
     analyze: Callable[[dict], Awaitable[dict]] | None = None,
     warm_timeout_ms: int = 15_000,
     sample_timeout_ms: int = 10_000,
-    traceroute_timeout_s: float = 30.0,
+    traceroute_timeout_s: float = float(os.getenv("TRACEROUTE_TIMEOUT_S", "30")),
 ) -> PipelineDeps:
     geo = geo or NullGeoProvider()
     reverse_resolver = reverse_resolver or DnspythonReverseResolver()

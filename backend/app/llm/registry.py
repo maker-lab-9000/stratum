@@ -21,8 +21,17 @@ _FACTORIES: list[tuple[str, type[LLMProvider]]] = [
 
 
 def build_registry(env: dict | None = None) -> dict[str, LLMProvider]:
-    """Instantiate every provider whose API key is present in the environment."""
+    """Instantiate every provider whose API key is present in the environment.
+
+    ``LLM_PROVIDER=fake`` swaps in a single keyless recorded-verdict provider for
+    the end-to-end stack (T24), ignoring real keys.
+    """
     env = env if env is not None else os.environ
+    if (env.get("LLM_PROVIDER") or "").strip().lower() == "fake":
+        from app.llm.fake import FakeProvider
+
+        fake = FakeProvider()
+        return {fake.id: fake}
     registry: dict[str, LLMProvider] = {}
     for var, provider_cls in _FACTORIES:
         key = env.get(var)

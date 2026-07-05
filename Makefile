@@ -41,5 +41,12 @@ docker-up: ## Build + run the api (UI + API on :8000). Needs a .env (see .env.ex
 docker-down:
 	docker compose down
 
+## --- End-to-end release gate (T24) ---------------------------------------
+e2e: ## Full docker-compose e2e: real api + fake LLM + controlled target
+	docker compose -f docker-compose.e2e.yml up -d --build
+	@echo "Waiting for api health…"
+	@for i in $$(seq 1 40); do curl -fsS http://localhost:8000/api/health >/dev/null 2>&1 && echo "api healthy" && break; sleep 2; done
+	@cd frontend && npm run test:e2e:stack; STATUS=$$?; cd ..; docker compose -f docker-compose.e2e.yml down -v; exit $$STATUS
+
 clean:
 	rm -rf backend/.venv backend/.pytest_cache frontend/node_modules frontend/dist

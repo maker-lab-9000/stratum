@@ -28,6 +28,12 @@ init_db(get_engine())
 _geo = build_geo_provider()
 
 _repo = get_repository()
+# A restart drops any in-flight in-process jobs; don't leave their rows stuck
+# in `running`/`queued` (§restart). Reconcile before accepting new work.
+_interrupted = _repo.fail_unfinished(reason="interrupted by restart")
+if _interrupted:
+    logging.getLogger(__name__).warning("marked %d interrupted report(s) as error", _interrupted)
+
 _manager = PipelineManager(
     _repo,
     concurrency=int(os.getenv("PIPELINE_CONCURRENCY", "2")),

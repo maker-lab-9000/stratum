@@ -100,6 +100,16 @@ Makefile     install / test / dev / docker entrypoints
 | `make test-backend` | `uv run pytest` in `backend/`         |
 | `make test-frontend`| `npm test` (vitest) in `frontend/`    |
 | `npm run test:e2e`  | Playwright a11y/visual/keyboard (in `frontend/`) |
+| `make e2e`          | Full docker-compose release gate (below) |
+
+**Release gate — `make e2e`.** Brings up a real stack (`docker-compose.e2e.yml`):
+the api with a keyless **`fake` LLM** (`LLM_PROVIDER=fake`, deterministic recorded
+verdicts; a URL containing `__degrade__` forces the degraded path) plus a
+controlled **target site** with configurable cache headers. Playwright drives
+full flows against the live api — happy path (launch → live run → report serving
+layer + progression → history), degraded path, and sampler→UI progression
+integrity — then tears the stack down. A restart mid-run never leaves a report
+stuck `running` (interrupted jobs are reconciled to `error` on boot).
 
 Accessibility & visual are covered by Playwright + axe-core (`frontend/e2e/`):
 no serious/critical axe violations on all four views, `prefers-reduced-motion`

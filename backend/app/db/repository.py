@@ -121,6 +121,18 @@ class ReportRepository:
         with self._session_factory() as session:
             return list(session.scalars(stmt))
 
+    def fail_unfinished(self, *, reason: str = "interrupted") -> int:
+        """Mark every still-`queued`/`running` report as `error` and return the
+        count. Called on boot: a process restart drops in-flight in-process jobs,
+        so their rows must not stay `running` forever (T24 §restart)."""
+        with self._session_factory() as session:
+            rows = list(session.scalars(select(Report).where(Report.status.in_(("queued", "running")))))
+            for report in rows:
+                report.status = "error"
+                report.error = reason
+            session.commit()
+            return len(rows)
+
     def delete(self, report_id: str) -> bool:
         """Delete by id. Returns True if a row was removed, False if absent."""
         with self._session_factory() as session:
