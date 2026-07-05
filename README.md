@@ -99,6 +99,13 @@ Makefile     install / test / dev / docker entrypoints
 | `make test`         | full suite, both sides                |
 | `make test-backend` | `uv run pytest` in `backend/`         |
 | `make test-frontend`| `npm test` (vitest) in `frontend/`    |
+| `npm run test:e2e`  | Playwright a11y/visual/keyboard (in `frontend/`) |
+
+Accessibility & visual are covered by Playwright + axe-core (`frontend/e2e/`):
+no serious/critical axe violations on all four views, `prefers-reduced-motion`
+kills animations, keyboard-only launch + report open, and layout holds at
+1280/390 with no page horizontal scroll. Palette contrast is enforced
+deterministically by `frontend/src/components/contrast.test.ts`.
 
 No live network or live-LLM calls run by default — fakes/fixtures only. Live
 tests are marked `@pytest.mark.live` and excluded from the default run.

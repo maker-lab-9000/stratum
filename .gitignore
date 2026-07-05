@@ -32,3 +32,8 @@ data/
 
 # OS / editor
 .DS_Store
+
+# Playwright (T23/T24) artifacts
+frontend/test-results/
+frontend/playwright-report/
+framework/.playwright/
