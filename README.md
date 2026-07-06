@@ -13,6 +13,14 @@ requirements spec for the full contract.
 > report → history flow works end-to-end, a single-origin Docker image ships the
 > whole app, and `make e2e` is the release gate.
 
+## Start here
+
+Point it at a URL, pick a provider + model (fetched live from the provider),
+and optionally tune the request count, interval, cache warm-up, geo hint, and
+custom request headers.
+
+![Launch form](docs/screenshots/launch.png)
+
 ## The report
 
 A single report, top to bottom (real analysis of `https://www.berlin.de/` —
