@@ -15,25 +15,38 @@ requirements spec for the full contract.
 
 ## The report
 
-A single report, top to bottom (real analysis of `https://futurism.com/`):
+A single report, top to bottom (real analysis of `https://www.berlin.de/` —
+served from an *unidentified* shared cache with no CDN vendor headers, so the
+verdict is honestly hedged at low confidence rather than guessed).
 
 **Verdict + network route** — the headline verdict tiles (cached, CDN cache,
-serving layer, hosting), DNS resolution, the computed route geography, the hop
-ladder, and the segment narration up to the measurement seam.
+serving layer, hosting), DNS resolution, and the computed route geography
+plotting the transit PoPs.
 
-![Verdict tiles and network route](docs/screenshots/report-verdict-network.png)
+![Verdict tiles, DNS and route geography](docs/screenshots/report-01-verdict-route.png)
 
-**Serving-layer analysis** — the topology chain with the serving node flagged,
-and the layer-by-layer breakdown. Every cache state is the LLM's, cited from
-response headers the backend verified.
+**Hop ladder** — the enriched TCP-traceroute hops (IP, rDNS, ASN/org, city, RTT
+bars), with private runs dimmed, timeouts as `* * *`, and same-ASN runs
+collapsed into one expandable row.
 
-![Serving-layer topology and breakdown](docs/screenshots/report-serving-layer.png)
+![Enriched traceroute hop ladder](docs/screenshots/report-02-hop-ladder.png)
 
-**Header progression + findings** — how the signals evolve across the N samples,
-and the severity-sorted security/performance findings, each with its evidence
-header.
+**Segment narration + serving layer** — the three route segments (access →
+transit → origin) up to the measurement seam, then the serving-layer topology
+chain with the serving node flagged and everything past the boundary dimmed.
 
-![Header progression and findings](docs/screenshots/report-progression-findings.png)
+![Segment narration, measurement seam and serving-layer topology](docs/screenshots/report-03-segments-topology.png)
+
+**Layer breakdown + header progression** — the per-layer table and how the cache
+signals evolve across the N samples.
+
+![Layer-by-layer breakdown and header progression](docs/screenshots/report-04-layers-progression.png)
+
+**Findings** — severity-sorted security and performance findings, each with its
+cited evidence header, plus the raw-headers drawer. Every claim is the LLM's,
+cited from response headers the backend machine-checked.
+
+![Security and performance findings](docs/screenshots/report-05-findings.png)
 
 ## Stack
 
