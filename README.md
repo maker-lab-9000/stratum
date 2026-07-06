@@ -9,9 +9,31 @@ verbatim and never interprets it; the LLM produces the entire verdict and every
 claim cites evidence that the backend machine-checks for existence. See the
 requirements spec for the full contract.
 
-> **Status:** active build. The full launch → live-run → report → history flow
-> works end-to-end, and a single-origin Docker image ships the whole app.
-> Remaining polish lands task-by-task (security gate, a11y pass, e2e suite).
+> **Status:** feature-complete against the spec — the full launch → live-run →
+> report → history flow works end-to-end, a single-origin Docker image ships the
+> whole app, and `make e2e` is the release gate.
+
+## The report
+
+A single report, top to bottom (real analysis of `https://futurism.com/`):
+
+**Verdict + network route** — the headline verdict tiles (cached, CDN cache,
+serving layer, hosting), DNS resolution, the computed route geography, the hop
+ladder, and the segment narration up to the measurement seam.
+
+![Verdict tiles and network route](docs/screenshots/report-verdict-network.png)
+
+**Serving-layer analysis** — the topology chain with the serving node flagged,
+and the layer-by-layer breakdown. Every cache state is the LLM's, cited from
+response headers the backend verified.
+
+![Serving-layer topology and breakdown](docs/screenshots/report-serving-layer.png)
+
+**Header progression + findings** — how the signals evolve across the N samples,
+and the severity-sorted security/performance findings, each with its evidence
+header.
+
+![Header progression and findings](docs/screenshots/report-progression-findings.png)
 
 ## Stack
 
