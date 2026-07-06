@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from app.api.schemas import CreateAnalysisRequest, CreateAnalysisResponse
-from app.llm.registry import available_models
+from app.llm.registry import available_models, get_provider
 from app.security import outbound_rejection_reason
 
 router = APIRouter(prefix="/api")
@@ -26,8 +26,20 @@ async def health() -> dict[str, str]:
 
 @router.get("/models")
 async def get_models() -> dict:
-    # Never includes key material — only ids/names (spec §10).
+    # Never includes key material — only ids/names (spec §10). Static, offline,
+    # fast — the initial provider list. Live per-provider lists come from below.
     return available_models()
+
+
+@router.get("/models/{provider}")
+async def get_provider_models(provider: str) -> dict:
+    """Live model list for one provider, fetched on demand from its API (falls
+    back to the provider's static list on any error — see ``list_models``).
+    Never includes key material. 404 if the provider isn't configured."""
+    prov = get_provider(provider)
+    if prov is None:
+        raise HTTPException(status_code=404, detail=f"provider '{provider}' is not configured")
+    return {"provider": provider, "models": await prov.list_models()}
 
 
 @router.post("/analyses", response_model=CreateAnalysisResponse, status_code=status.HTTP_201_CREATED)

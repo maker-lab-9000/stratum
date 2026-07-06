@@ -15,7 +15,7 @@ from app.security import add_basic_auth
 
 
 def create_app(repo, manager, *, serve_static: bool = True) -> FastAPI:
-    app = FastAPI(title="Stratum", version="1.0.0")
+    app = FastAPI(title="Stratum", version="1.0.1")
     app.state.repo = repo
     app.state.manager = manager
     app.include_router(router)

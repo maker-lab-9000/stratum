@@ -5,9 +5,14 @@ import { useNavigate } from "react-router-dom";
 import {
   createAnalysis,
   getModels,
+  getProviderModels,
   type CreateAnalysisBody,
+  type ModelInfo,
   type ProviderInfo,
 } from "../api/client";
+
+// Above this many models, the picker gets a filter box (OpenRouter lists ~300).
+const MODEL_FILTER_THRESHOLD = 15;
 
 interface HeaderRow {
   name: string;
@@ -28,6 +33,10 @@ export function Launch() {
   const [providers, setProviders] = useState<ProviderInfo[] | null>(null);
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  // Live model lists fetched per provider on demand, cached by provider id.
+  const [liveModels, setLiveModels] = useState<Record<string, ModelInfo[]>>({});
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelFilter, setModelFilter] = useState("");
 
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -46,7 +55,7 @@ export function Launch() {
       .then((data) => {
         setProviders(data.providers);
         if (data.providers.length > 0) {
-          setProvider(data.providers[0].id);
+          setProvider(data.providers[0].id); // triggers the live-models effect below
           setModel(data.providers[0].models[0]?.id ?? "");
         }
       })
@@ -56,11 +65,52 @@ export function Launch() {
   const currentProvider = providers?.find((p) => p.id === provider);
   const noProviders = providers !== null && providers.length === 0;
 
+  // Fetch the selected provider's live model list on demand (cached per
+  // provider). The static list from /api/models seeds the picker instantly; the
+  // live list replaces it when it lands, falling back to static on any error.
+  useEffect(() => {
+    if (!provider || liveModels[provider]) return;
+    const staticModels = providers?.find((p) => p.id === provider)?.models ?? [];
+    let cancelled = false;
+    setModelsLoading(true);
+    getProviderModels(provider)
+      .then(({ models }) => (models.length ? models : staticModels))
+      .catch(() => staticModels)
+      .then((list) => {
+        if (cancelled) return;
+        setLiveModels((prev) => ({ ...prev, [provider]: list }));
+        // Keep the current selection if it survived; else default to the first.
+        setModel((m) => (list.some((x) => x.id === m) ? m : list[0]?.id ?? ""));
+      })
+      .finally(() => !cancelled && setModelsLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [provider, providers, liveModels]);
+
   function onProviderChange(id: string) {
     setProvider(id);
+    setModelFilter("");
+    // Show the cached/static list immediately; the effect fetches live if needed.
     const next = providers?.find((p) => p.id === id);
-    setModel(next?.models[0]?.id ?? "");
+    const seeded = liveModels[id] ?? next?.models ?? [];
+    setModel(seeded[0]?.id ?? "");
   }
+
+  // Models shown in the picker: live list if fetched, else the static seed.
+  const providerModels = liveModels[provider] ?? currentProvider?.models ?? [];
+  const showModelFilter = providerModels.length > MODEL_FILTER_THRESHOLD;
+  const filteredModels = modelFilter.trim()
+    ? providerModels.filter((m) =>
+        `${m.name} ${m.id}`.toLowerCase().includes(modelFilter.trim().toLowerCase()),
+      )
+    : providerModels;
+  // Never drop the current selection from the rendered options (filtering is a
+  // find-aid, not a constraint on what's selected).
+  const renderedModels =
+    model && !filteredModels.some((m) => m.id === model)
+      ? [...(providerModels.filter((m) => m.id === model)), ...filteredModels]
+      : filteredModels;
 
   function updateHeader(index: number, patch: Partial<HeaderRow>) {
     setHeaders((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
@@ -169,15 +219,34 @@ export function Launch() {
             </div>
             <div className="field">
               <label className="field-label" htmlFor="model">
-                Model
+                Model{" "}
+                {modelsLoading ? (
+                  <span className="field-hint" role="status">
+                    · loading…
+                  </span>
+                ) : (
+                  <span className="field-hint">· {providerModels.length} available</span>
+                )}
               </label>
+              {showModelFilter && (
+                <input
+                  className="input"
+                  type="search"
+                  placeholder="filter models…"
+                  aria-label="Filter models"
+                  value={modelFilter}
+                  onChange={(e) => setModelFilter(e.target.value)}
+                  style={{ marginBottom: 8 }}
+                />
+              )}
               <select
                 id="model"
                 className="select"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
+                disabled={modelsLoading && providerModels.length === 0}
               >
-                {(currentProvider?.models ?? []).map((m) => (
+                {renderedModels.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
                   </option>

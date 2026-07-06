@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import { createAnalysis, getModels } from "../api/client";
+import { createAnalysis, getModels, getProviderModels } from "../api/client";
 import { Launch } from "./Launch";
 
 const navigateMock = vi.fn();
@@ -12,6 +12,7 @@ vi.mock("react-router-dom", async (orig) => {
 });
 vi.mock("../api/client", () => ({
   getModels: vi.fn(),
+  getProviderModels: vi.fn(),
   createAnalysis: vi.fn(),
 }));
 
@@ -26,6 +27,13 @@ beforeEach(() => {
   navigateMock.mockReset();
   vi.mocked(getModels).mockReset().mockResolvedValue(PROVIDERS);
   vi.mocked(createAnalysis).mockReset().mockResolvedValue({ id: "rep-123" });
+  // By default the live list echoes the provider's static seed (no change).
+  vi.mocked(getProviderModels)
+    .mockReset()
+    .mockImplementation(async (p: string) => ({
+      provider: p,
+      models: PROVIDERS.providers.find((x) => x.id === p)?.models ?? [],
+    }));
 });
 
 async function renderLoaded() {
@@ -127,4 +135,56 @@ test("keyboard: URL -> provider tab order; Enter submits", async () => {
   await user.keyboard("{Enter}");
 
   await waitFor(() => expect(createAnalysis).toHaveBeenCalled());
+});
+
+// --- Scenario 6: dynamic per-provider model listing (1.0.1) -------------------
+
+test("selecting a provider fetches its live models and filters a large list", async () => {
+  const user = userEvent.setup();
+  // OpenRouter returns a large live list; Anthropic stays small.
+  const bigList = Array.from({ length: 40 }, (_, i) => ({
+    id: `vendor/model-${i}`,
+    name: `Model ${i}`,
+  }));
+  bigList.push({ id: "anthropic/claude-opus-4-8", name: "Claude Opus 4.8 (via OR)" });
+  vi.mocked(getProviderModels).mockImplementation(async (p: string) => ({
+    provider: p,
+    models: p === "openrouter" ? bigList : PROVIDERS.providers[0].models,
+  }));
+
+  await renderLoaded();
+  // Anthropic (2 models incl. the one static) → no filter box yet.
+  expect(screen.queryByLabelText("Filter models")).not.toBeInTheDocument();
+
+  await user.selectOptions(screen.getByLabelText("Provider"), "openrouter");
+
+  // The live list lands: a distinctive live-only model appears as an option.
+  expect(await screen.findByRole("option", { name: "Model 7" })).toBeInTheDocument();
+  expect(getProviderModels).toHaveBeenCalledWith("openrouter");
+
+  // A large list gets a filter box that narrows the options.
+  const filter = screen.getByLabelText("Filter models");
+  await user.type(filter, "Model 33");
+  expect(screen.getByRole("option", { name: "Model 33" })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: "Model 7" })).not.toBeInTheDocument();
+});
+
+test("live models replace the static seed for the chosen model in the POST", async () => {
+  const user = userEvent.setup();
+  vi.mocked(getProviderModels).mockImplementation(async (p: string) => ({
+    provider: p,
+    models: p === "openrouter" ? [{ id: "x-ai/grok-4", name: "Grok 4" }] : PROVIDERS.providers[0].models,
+  }));
+
+  await renderLoaded();
+  await user.selectOptions(screen.getByLabelText("Provider"), "openrouter");
+  await screen.findByRole("option", { name: "Grok 4" });
+
+  await user.type(screen.getByLabelText("Target URL"), "https://x.test/");
+  await user.click(screen.getByRole("button", { name: /run analysis/i }));
+
+  await waitFor(() => expect(createAnalysis).toHaveBeenCalled());
+  const body = vi.mocked(createAnalysis).mock.calls[0][0];
+  expect(body.provider).toBe("openrouter");
+  expect(body.model).toBe("x-ai/grok-4"); // the live model, not a static default
 });

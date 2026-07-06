@@ -57,6 +57,14 @@ export async function getModels(): Promise<{ providers: ProviderInfo[] }> {
   return json(await fetch("/api/models"));
 }
 
+/** Live model list for one provider (fetched on demand; server falls back to
+ * the provider's static list on any upstream error). */
+export async function getProviderModels(
+  provider: string,
+): Promise<{ provider: string; models: ModelInfo[] }> {
+  return json(await fetch(`/api/models/${encodeURIComponent(provider)}`));
+}
+
 export async function createAnalysis(body: CreateAnalysisBody): Promise<{ id: string }> {
   return json(
     await fetch("/api/analyses", {

@@ -200,3 +200,51 @@ async def test_spa_fallback_serves_index_for_client_routes(tmp_path):
             resp = await c.get(path)
             assert resp.status_code == 200
             assert "APP" in resp.text
+
+
+# --- 1.0.1: live per-provider model listing (GET /api/models/{provider}) ------
+
+async def test_provider_models_live_list(client, monkeypatch):
+    import httpx
+    import respx
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    with respx.mock:
+        respx.get("https://openrouter.ai/api/v1/models").mock(
+            return_value=httpx.Response(
+                200,
+                json={"data": [
+                    {"id": "anthropic/claude-opus-4-8", "name": "Claude Opus 4.8"},
+                    {"id": "openai/gpt-5", "name": "GPT-5"},
+                    {"id": "meta-llama/llama-3", "name": "Llama 3"},
+                ]},
+            )
+        )
+        resp = await client.get("/api/models/openrouter")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["provider"] == "openrouter"
+    assert [m["id"] for m in body["models"]] == [
+        "anthropic/claude-opus-4-8", "openai/gpt-5", "meta-llama/llama-3",
+    ]
+    # No key material ever leaks into the response (§10).
+    assert "sk-or-test" not in resp.text
+
+
+async def test_provider_models_falls_back_to_static_on_upstream_error(client, monkeypatch):
+    import httpx
+    import respx
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    with respx.mock:
+        respx.get("https://openrouter.ai/api/v1/models").mock(return_value=httpx.Response(500))
+        resp = await client.get("/api/models/openrouter")
+    assert resp.status_code == 200  # degrades, never errors
+    assert len(resp.json()["models"]) > 0  # the provider's static list
+
+
+async def test_provider_models_unknown_provider_404(client, monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    resp = await client.get("/api/models/openrouter")
+    assert resp.status_code == 404
