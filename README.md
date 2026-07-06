@@ -89,6 +89,19 @@ volume, so history survives `docker compose restart`.
 > report renders with an empty route — but you get no hop/geo data. On hosts
 > that forbid `cap_add`, use host networking instead.
 
+> **⚠ Run on a native Linux Docker host for a full route.** Traceroute reflects
+> the network the container actually sits on. On a Linux host (the Proxmox
+> homelab target) the container is on the real network and traces the full path.
+> On **Docker Desktop (macOS / Windows)** containers run inside a Linux VM whose
+> networking is a userspace NAT (gVisor/vpnkit) that does not preserve L3 hops —
+> so the route collapses to `docker-gateway → CDN edge` (2 hops) regardless of
+> `cap_add` or `network_mode: host` (which binds the *VM's* network, not your
+> Mac's). Everything else — DNS, header sampling, the serving-layer verdict,
+> findings — is unaffected; only the intermediate hops are hidden. Relatedly,
+> CDN edge IPs are usually **anycast**, so the map's city is advisory (a low RTT
+> to a far-away city means you hit a nearby PoP); the report always discloses the
+> vantage for this reason.
+
 Building on a non-amd64 machine? `docker compose build` with
 `platforms: ["linux/amd64"]` uncommented in `docker-compose.yml`, or
 `docker build --platform linux/amd64 -t stratum-api .`.
