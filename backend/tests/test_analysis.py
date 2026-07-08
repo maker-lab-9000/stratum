@@ -173,6 +173,12 @@ def test_prompt_contains_constraints_and_vendor_table():
     # Progression guidance.
     assert "Age flat at 0" in SYSTEM_PROMPT
     assert "CDN bypass" in SYSTEM_PROMPT
+    # 1.0.2: non-zero Age is first-class hit evidence, and the verdict must not
+    # contradict the narration (multi-CDN inner-cache case; guard against drift).
+    assert "non-zero `Age`" in SYSTEM_PROMPT
+    assert "Never report `cached: false`" in SYSTEM_PROMPT
+    assert "must not contradict your `segment_narration`" in SYSTEM_PROMPT
+    assert "an outer CDN often overwrites the inner cache's".lower() in SYSTEM_PROMPT.lower()
 
 
 # --- Scenario 6 ---------------------------------------------------------------

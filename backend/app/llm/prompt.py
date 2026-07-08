@@ -19,7 +19,8 @@ VENDOR_TABLE = """\
 | Varnish (generic) | `Via`/`X-Varnish` | `X-Cache`, `X-Varnish` (2 IDs = hit) |
 | Apache dispatcher (AEM) | `Server: Apache`, `X-Dispatcher`, `Server-Timing: dispatcher;desc=…` | `Server-Timing` dispatcher token, `X-Cache-Info` |
 | nginx proxy_cache | `X-Cache-Status` | `X-Cache-Status` (`HIT`/`MISS`) |
-| Generic | `Age`, `Cache-Control`, `Via` hop count | `Age` progression, `Via` chain |"""
+| Fastly/Varnish (behind another CDN) | leaked `x-served-by: cache-*`, `x-timer` (`VS`/`VE`), `X-Varnish` | non-zero `Age` (its own `x-cache` may be overwritten by the outer CDN) |
+| Generic / unidentified | non-zero `Age`, `Cache-Control`, `Via` hop count | **non-zero `Age` = a shared cache stored & served it, even under an edge MISS**; `Age` progression, `Via` chain |"""
 
 # --- §5.2 output schema (shown so the model matches it exactly) ---
 OUTPUT_SCHEMA = """\
@@ -85,6 +86,9 @@ interpretive claim must be justified by evidence from the bundle.
 - Every claim you make — vendor, hit/miss state, serving layer, layer count, provider — must cite evidence that appears verbatim in the input: an exact header name + value, a CNAME record, or an ASN organisation string. Your citations are machine-checked against the captured data. If evidence is ambiguous or missing, answer `UNKNOWN` — never guess.
 - Do not infer cache layers from traceroute hops. Traceroute stops at the CDN edge and cannot see past it.
 - The serving layer is the first layer in the user→origin chain reporting a hit. Count only cache-capable layers toward the layer count.
+- A non-zero `Age` on the response is direct, citable proof that a shared cache stored and served this object. If the outermost layer reports MISS/PASS but `Age` > 0, a cache **downstream of it** served the request: add that caching layer, mark it `HIT` citing `age: <value>`, and treat it as the serving layer. Never report `cached: false` — least of all at high confidence — while `Age` > 0.
+- An outer CDN often overwrites the inner cache's `x-cache` / `Via` / `Server` with its own. Leaked fingerprints (`x-served-by: cache-*`, `x-timer` with `VS`/`VE` fields, `X-Varnish`) together with a non-zero `Age` reveal an inner cache tier even when its own hit token is gone — represent it as its own layer, naming it from the fingerprint (or `"unidentified shared cache"` with `role: unknown` if the vendor is unclear).
+- Your `cache_verdict` must not contradict your `segment_narration` or findings: if you narrate that an upstream cache served the object, `cached` must be `true` and that tier must be the serving layer.
 - Classify each layer's role (client / edge / shield / security / load balancer / reverse proxy / app cache / origin / unknown) and whether it caches. WAFs and load balancers forward without caching — report them as forwarding, never as cache misses.
 - Narrate the route as 2–4 segments (Access / Transit / CDN / Origin), not one blurb per router.
 - Output only valid JSON matching the schema. No commentary.
@@ -110,9 +114,13 @@ confidence is the required answer, not a best guess.
 Order the recognised cache layers from user→origin (edge → parent/shield →
 reverse-proxy/dispatcher → origin); the first layer reporting a hit is the
 serving layer and the serving boundary. Everything beyond it is "not reached" on
-a hit. Layer count to origin = number of cache-capable layers (`caches: true`)
-identified from the `Via` chain + vendor headers. When nothing caches, `cached`
-is false and `serving_layer` names the origin layer — a valid, common verdict.
+a hit. "Reporting a hit" includes a downstream shared cache evidenced by a
+non-zero `Age` (see the rule above), not only explicit vendor HIT tokens — so a
+MISS at the outer edge does **not** mean nothing served from cache. Layer count
+to origin = number of cache-capable layers (`caches: true`) identified from the
+`Via` chain + vendor headers. `cached` is false only when **no** layer reports a
+hit **and** `Age` is absent/zero; then `serving_layer` names the origin layer — a
+valid, common verdict.
 
 ## Request-progression guidance (§4.3)
 
@@ -120,6 +128,7 @@ The bundle gives you per-sample Age values and their deltas, and Cache-Control
 values. Interpret them:
 - Age climbing across consecutive requests → a shared cache is retaining the object.
 - Age flat at 0 with short/`no-cache` Cache-Control → that layer is NOT storing (e.g. CDN bypass — the classic flat-Age finding).
+- Age **non-zero** while the outer edge reports MISS/PASS → the edge is a passthrough and a cache **behind it** served the object; the served-from layer is that downstream cache, not the edge. (Age flat but non-zero across closely-spaced requests is normal for a warm shared cache, not a bypass.)
 - Hit/miss transition between request 1 (cold) and later requests → warm-up behaviour.
 
 ## Provider identity (§4.5)

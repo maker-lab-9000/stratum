@@ -1,6 +1,6 @@
 [project]
 name = "stratum-backend"
-version = "1.0.1"
+version = "1.0.2"
 description = "Stratum — Cache & Delivery Analyzer (backend + pipeline)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
