@@ -36,7 +36,7 @@ if _interrupted:
 
 _manager = PipelineManager(
     _repo,
-    concurrency=int(os.getenv("PIPELINE_CONCURRENCY", "2")),
+    concurrency=int(os.getenv("PIPELINE_CONCURRENCY", "1")),
     deps=default_deps(analyze=make_llm_analyze(), geo=_geo),
     vantage=os.getenv("VANTAGE_LABEL", "unknown vantage"),
 )

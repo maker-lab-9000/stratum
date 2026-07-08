@@ -46,12 +46,14 @@ class ProviderError(Exception):
         retryable: bool,
         kind: str = "error",
         status_code: int | None = None,
+        retry_after: float | None = None,
     ) -> None:
         super().__init__(message)
         self.provider = provider
         self.retryable = retryable
         self.kind = kind  # auth | rate_limit | transient | invalid_request | error
         self.status_code = status_code
+        self.retry_after = retry_after  # seconds from a Retry-After header, if any
 
 
 def classify_status(status: int) -> tuple[str, bool]:
@@ -98,8 +100,21 @@ async def request_json(
             retryable=retryable,
             kind=kind,
             status_code=response.status_code,
+            retry_after=_parse_retry_after(response.headers.get("retry-after")),
         )
     return response.json()
+
+
+def _parse_retry_after(value: str | None) -> float | None:
+    """Parse a ``Retry-After`` header. Only the delta-seconds form is honored
+    (the HTTP-date form is ignored — backoff takes over)."""
+    if value is None:
+        return None
+    try:
+        seconds = float(value.strip())
+    except ValueError:
+        return None
+    return seconds if seconds >= 0 else None
 
 
 class LLMProvider(abc.ABC):

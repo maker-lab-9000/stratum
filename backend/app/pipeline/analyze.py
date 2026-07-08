@@ -44,6 +44,11 @@ def make_llm_analyze(
         except AnalysisParseError as exc:
             return _degraded(f"LLM returned invalid output after {exc.attempts} attempts")
         except ProviderError as exc:
+            if exc.kind == "rate_limit":
+                return _degraded(
+                    f"rate-limited by provider '{exc.provider}' after retries — "
+                    "retry later or use a paid model (free-tier models have low daily caps)"
+                )
             return _degraded(f"{exc.kind} error from provider '{exc.provider}'")
 
         # No unvalidated verdict reaches the DB: validate before returning.
