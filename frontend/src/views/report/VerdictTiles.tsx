@@ -1,11 +1,11 @@
-import { Badge, ConfBar, DegradedBanner, Tile } from "../../components";
+import { Badge, DegradedBanner, Tile } from "../../components";
 import type { Report } from "../../api/client";
 import type { CacheVerdict } from "./types";
 import { flagsFor, isDegraded } from "./types";
 
 // The four verdict tiles, in the user→origin axis used everywhere:
-// Cached? → CDN cache → Served from → Hosting/CDN (§8.1.3).
-const CONF_PERCENT: Record<string, number> = { high: 92, medium: 66, low: 33 };
+// Cached? → CDN cache → Served from → Hosting/CDN (§8.1.3). The verdict's
+// confidence lives in the headline line above the tiles (VerdictConfidence).
 
 const CDN_ROLES = new Set(["edge", "shield"]);
 
@@ -53,7 +53,7 @@ export function VerdictTiles({ report, onRerun }: VerdictTilesProps) {
 
   const cachedStatus = verdict.cached ? "hit" : "accent";
   const providerUnknown = verdict.provider === "UNKNOWN";
-  const confPct = CONF_PERCENT[verdict.confidence] ?? 33;
+  const timingGap = verdict.timing_check?.status === "gap";
 
   return (
     <div className="verdict">
@@ -62,9 +62,7 @@ export function VerdictTiles({ report, onRerun }: VerdictTilesProps) {
         value={verdict.cached ? "Yes" : "No"}
         status={cachedStatus}
         foot={verdict.cached ? `at ${verdict.serving_layer}` : "no layer holds the object"}
-      >
-        <ConfBar percent={confPct} label={`LLM verdict · ${verdict.confidence}`} />
-      </Tile>
+      />
 
       <Tile
         label="CDN cache"
@@ -86,6 +84,7 @@ export function VerdictTiles({ report, onRerun }: VerdictTilesProps) {
           <>
             layer {verdict.layer_count_to_origin} of {verdict.layer_count_to_origin}
             {servingFlagged && <Badge variant="unverified" />}
+            {timingGap && <Badge variant="timing-gap" />}
           </>
         }
       />

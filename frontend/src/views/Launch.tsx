@@ -47,6 +47,7 @@ export function Launch() {
   const [requestCount, setRequestCount] = useState("4");
   const [intervalMs, setIntervalMs] = useState("0");
   const [warm, setWarm] = useState(true);
+  const [cacheBust, setCacheBust] = useState(true);
   const [geoHint, setGeoHint] = useState("");
   const [headers, setHeaders] = useState<HeaderRow[]>([{ name: "", value: "" }]);
 
@@ -139,6 +140,7 @@ export function Launch() {
         request_count: Number(requestCount) || 4,
         interval_ms: Number(intervalMs) || 0,
         warm,
+        cache_bust_probe: cacheBust,
         extra_request_headers,
         geo_hint: geoHint.trim() || null,
       },
@@ -294,6 +296,10 @@ export function Launch() {
             <label className="check">
               <input type="checkbox" checked={warm} onChange={(e) => setWarm(e.target.checked)} />
               Warm the cache (browser navigation) before sampling
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={cacheBust} onChange={(e) => setCacheBust(e.target.checked)} />
+              Cache-bust probe (forced miss)
             </label>
             <div className="field">
               <label className="field-label" htmlFor="geo-hint">

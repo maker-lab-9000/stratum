@@ -23,6 +23,15 @@ evidence descriptively, e.g. ``hop 2 org: <captured org>`` or
    citation wrapping a real hostname/org/IP.
 
 Fabricated values still fail: neither their value nor any captured token matches.
+
+Timing (1.2.0): the cache-bust probe's headers are excluded from evidence for
+layer / sample / provider / finding claims (the probe is not one of the N
+requests). ``timing_check`` citations are checked against the bundle's
+``timing.facts`` by **exact** match (a separate set, never the loose index, so a
+number that merely appears elsewhere can't pass); its non-timing citations may
+also use the probe's headers. When validation lowers the headline confidence or
+discards the timing assessment, a fixed note is appended to
+``confidence_reason`` so the report never explains a claim it no longer shows.
 """
 
 from __future__ import annotations
@@ -31,11 +40,27 @@ import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 
-from app.llm.schema import StructuredResult
+from app.llm.schema import StructuredResult, TimingCheck
 
 _REASON = "citation not found in captured evidence"
 _NO_EVIDENCE = "no evidence provided for this claim"
+_NO_TIMING_FACT = "no timing fact cited"
+_NOT_PROVIDED = "not provided"
+_PROBE_ONLY = "cited header appears only on the cache-bust probe"
 _AS_TOKEN = re.compile(r"\bas(\d+)\b", re.IGNORECASE)
+# A citation shaped like one of the bundle's timing facts must match one exactly:
+# any "<field>_ms: <number>" (wherever it appears), or the fact labels themselves.
+_FACT_SHAPE = re.compile(
+    r"\b\w+_ms\s*:\s*-?\d|^edge_rtt_ms|^warm server_ms|^cache_bust (ttfb_ms|server_ms|status)",
+    re.IGNORECASE,
+)
+
+DISCARDED_SUMMARY = (
+    "Timing assessment discarded: its timing evidence was not found in the captured data."
+)
+
+NOTE_SERVING = " · citation check: serving-layer evidence not found in the captured data"
+NOTE_TIMING = " · citation check: timing evidence not found — timing assessment discarded"
 
 
 @dataclass
@@ -70,7 +95,7 @@ class _EvidenceIndex:
 
     _MIN_TOKEN = 4  # ignore trivially-short captured values (e.g. Age "0")
 
-    def __init__(self, bundle: dict) -> None:
+    def __init__(self, bundle: dict, *, include_probe: bool = False) -> None:
         self._by_name: dict[str, list[str]] = defaultdict(list)
         self._numbers: set[int] = set()
         blob_parts: list[str] = []
@@ -78,6 +103,8 @@ class _EvidenceIndex:
         values: list[str] = []
 
         for sample in bundle.get("samples") or []:
+            if not include_probe and isinstance(sample, dict) and sample.get("probe"):
+                continue
             for pair in sample.get("headers") or []:
                 if isinstance(pair, (list, tuple)) and len(pair) == 2:
                     name, value = pair
@@ -158,6 +185,11 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
     """Validate every citation in ``result`` against ``bundle``; return a copy
     with failed claims downgraded to UNKNOWN plus a flag list."""
     index = _EvidenceIndex(bundle)
+    probe_index = _EvidenceIndex(bundle, include_probe=True)
+
+    def reason_for(citation: str) -> str:
+        return _PROBE_ONLY if probe_index.contains(citation) else _REASON
+
     verdict = result.model_copy(deep=True)
     flags: list[ValidationFlag] = []
     cv = verdict.cache_verdict
@@ -172,7 +204,7 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
             if not layer.evidence_headers:
                 flags.append(ValidationFlag(f"cache_verdict.layers[{i}].state", "", _NO_EVIDENCE))
             for citation in failed:
-                flags.append(ValidationFlag(f"cache_verdict.layers[{i}].state", citation, _REASON))
+                flags.append(ValidationFlag(f"cache_verdict.layers[{i}].state", citation, reason_for(citation)))
 
     # Per-sample states.
     for i, sample in enumerate(cv.sample_states):
@@ -182,7 +214,7 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
             if not sample.evidence_headers:
                 flags.append(ValidationFlag(f"cache_verdict.sample_states[{i}].state", "", _NO_EVIDENCE))
             for citation in failed:
-                flags.append(ValidationFlag(f"cache_verdict.sample_states[{i}].state", citation, _REASON))
+                flags.append(ValidationFlag(f"cache_verdict.sample_states[{i}].state", citation, reason_for(citation)))
 
     # Provider identity.
     provider_failed = [c for c in cv.provider_evidence if not index.contains(c)]
@@ -191,17 +223,20 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
         if not cv.provider_evidence:
             flags.append(ValidationFlag("cache_verdict.provider", "", _NO_EVIDENCE))
         for citation in provider_failed:
-            flags.append(ValidationFlag("cache_verdict.provider", citation, _REASON))
+            flags.append(ValidationFlag("cache_verdict.provider", citation, reason_for(citation)))
 
     # Serving-layer cascade: if the serving layer's own evidence failed, the
     # headline verdict is uncertain — lower confidence and flag it. The name is
     # kept as the best-effort boundary rather than blanked.
     if cv.serving_layer and cv.serving_layer in downgraded_layers:
         cv.confidence = "low"
+        cv.confidence_reason = (cv.confidence_reason or "") + NOTE_SERVING
         flags.append(ValidationFlag(
             "cache_verdict.serving_layer", cv.serving_layer,
             "serving-layer evidence failed validation; confidence lowered to low",
         ))
+
+    _validate_timing(cv, bundle, flags)
 
     # Findings: a finding often cites the ABSENCE of a header (e.g. a missing
     # security header) — its bare header name is legitimately not present, so it
@@ -215,6 +250,44 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
         for i, finding in enumerate(findings):
             header = finding.evidence_header
             if ":" in header and not index.contains(header):
-                flags.append(ValidationFlag(f"{section}[{i}].evidence_header", header, _REASON))
+                flags.append(ValidationFlag(f"{section}[{i}].evidence_header", header, reason_for(header)))
 
     return ValidationResult(verdict=verdict, flags=flags)
+
+
+def _validate_timing(cv, bundle: dict, flags: list[ValidationFlag]) -> None:
+    """Exact-match timing citations; an unsupported assessment is discarded."""
+    path = "cache_verdict.timing_check"
+    if cv.timing_check is None:
+        cv.timing_check = TimingCheck(status="insufficient")
+        flags.append(ValidationFlag(path, "", cv.timing_check_error or _NOT_PROVIDED))
+        return
+    if cv.timing_check.status == "insufficient":
+        return  # no timing claim made — nothing to verify
+
+    timing = bundle.get("timing") or {}
+    facts = {str(f).strip() for f in timing.get("facts") or []}
+    index = _EvidenceIndex(bundle, include_probe=True)
+    failed: list[str] = []
+    cited_fact = False
+    for citation in cv.timing_check.evidence:
+        text = (citation or "").strip()
+        if text in facts:
+            cited_fact = True
+        elif _FACT_SHAPE.search(text) or not index.contains(text):
+            failed.append(citation)
+    if cited_fact and not failed:
+        return
+
+    # Discard the claim entirely — the UI must not keep showing its summary,
+    # confidence, or the citations that failed (they stay in the flags).
+    cv.timing_check.status = "insufficient"
+    cv.timing_check.hidden_layer_suspected = False
+    cv.timing_check.summary = DISCARDED_SUMMARY
+    cv.timing_check.confidence = "low"
+    cv.timing_check.evidence = []
+    cv.confidence_reason = (cv.confidence_reason or "") + NOTE_TIMING
+    if not cited_fact:
+        flags.append(ValidationFlag(path, "", _NO_TIMING_FACT))
+    for citation in failed:
+        flags.append(ValidationFlag(path, citation, _REASON))

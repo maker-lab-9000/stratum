@@ -31,3 +31,10 @@ test("structural pill/badge carry no status tone (no green leak)", () => {
   expect(classOf(render(<Badge variant="pill">x</Badge>).container)).not.toMatch(/hit|served/);
   expect(classOf(render(<Badge variant="badge">x</Badge>).container)).not.toMatch(/hit|served/);
 });
+
+test("timing-gap variant renders the amber dashed tag", () => {
+  const { container } = render(<Badge variant="timing-gap" />);
+  const el = container.firstChild as HTMLElement;
+  expect(el.className).toBe("unverified timing-gap");
+  expect(el.textContent).toBe("timing gap");
+});

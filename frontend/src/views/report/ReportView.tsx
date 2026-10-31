@@ -5,6 +5,10 @@ import { getReport, rerunAnalysis, type Report } from "../../api/client";
 import { Badge } from "../../components";
 import { Section01 } from "./Section01";
 import { Section02 } from "./Section02";
+import { splitSamples } from "./timing";
+import type { CacheVerdict, RawSample } from "./types";
+import { isDegraded } from "./types";
+import { VerdictConfidence } from "./VerdictConfidence";
 import { VerdictTiles } from "./VerdictTiles";
 
 // The report centerpiece. Loads by id (or renders an injected report, used by the
@@ -79,7 +83,9 @@ export function ReportView({ report: injected }: ReportViewProps) {
               </Badge>
             )}
             {report.samples_json && (
-              <Badge variant="pill">{report.samples_json.length} requests</Badge>
+              <Badge variant="pill">
+                {splitSamples(report.samples_json as unknown as RawSample[]).requests.length} requests
+              </Badge>
             )}
             {createdLabel && <Badge variant="pill">{createdLabel}</Badge>}
           </div>
@@ -90,6 +96,9 @@ export function ReportView({ report: injected }: ReportViewProps) {
       </header>
 
       <main className="wrap">
+        <VerdictConfidence
+          verdict={isDegraded(report.verdict_json) ? null : (report.verdict_json as unknown as CacheVerdict | null)}
+        />
         <VerdictTiles report={report} onRerun={onRerun} />
         <Section01 report={report} />
         <Section02 report={report} />

@@ -1,7 +1,7 @@
 {
   "meta": {
     "url": "https://www.example-foods.com/",
-    "vantage": "Berlin, DE \u00b7 homelab",
+    "vantage": "Berlin, DE · homelab",
     "request_options": {
       "request_count": 4,
       "interval_ms": 250,
@@ -188,6 +188,11 @@
       0,
       0
     ],
+    "wall_deltas_s": [
+      0.2,
+      0.2,
+      0.2
+    ],
     "cache_control": [
       "no-cache, no-store",
       "no-cache, no-store",
@@ -206,6 +211,12 @@
       43.0,
       44.0
     ]
+  },
+  "timing": {
+    "edge_rtt_ms": null,
+    "requests": [],
+    "cache_bust": null,
+    "facts": []
   },
   "traceroute": {
     "tool": "mtr",
@@ -240,6 +251,11 @@
       }
     ],
     "geo_available": true,
-    "enrichment_notes": []
+    "enrichment_notes": [],
+    "seam": {
+      "status": "unconfirmed",
+      "traced_ip": "23.55.1.1",
+      "peer_ips": []
+    }
   }
 }

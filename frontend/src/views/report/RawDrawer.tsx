@@ -4,12 +4,8 @@ import { Fragment, useState } from "react";
 // Request tabs up to 8, a <select> beyond that (§8.4). Header names/values are
 // rendered as React text nodes, so any injection probe in a captured value
 // (e.g. `<img src=x onerror=…>`) shows as inert text — never as markup.
-interface Sample {
-  request: number;
-  http_version?: string;
-  status?: number;
-  headers: [string, string][];
-}
+import { isProbe } from "./timing";
+import type { RawSample as Sample } from "./types";
 
 const TAB_LIMIT = 8;
 
@@ -28,7 +24,8 @@ function RawBody({ sample }: { sample: Sample }) {
   );
 }
 
-const tabLabel = (s: Sample) => (s.request === 1 ? "Request 1 · cold" : `Request ${s.request}`);
+const tabLabel = (s: Sample) =>
+  isProbe(s) ? "Cache-bust probe" : s.request === 1 ? "Request 1 · cold" : `Request ${s.request}`;
 
 export function RawDrawer({ samples }: { samples: Sample[] }) {
   const [active, setActive] = useState(samples[0]?.request ?? 1);

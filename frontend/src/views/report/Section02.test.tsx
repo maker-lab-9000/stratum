@@ -243,3 +243,64 @@ test("RawDrawer switches to a <select> beyond 8 requests", () => {
   expect(screen.getByLabelText("Select request")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Request 1/ })).not.toBeInTheDocument();
 });
+
+// --- 1.2.0: timing rows, cache-bust probe ----------------------------------
+
+function timed(
+  request: number,
+  ttfb: number | null,
+  extra: { connect?: number; probe?: boolean; headers?: [string, string][] } = {},
+) {
+  return {
+    request,
+    http_version: "HTTP/2",
+    status: 200,
+    started_at_ms: (request - 1) * 1500,
+    headers: extra.headers ?? ([["age", "0"]] as [string, string][]),
+    peer_ip: "18.64.119.98",
+    timing: { connect_ms: null, tls_ms: null, ttfb_ms: ttfb, total_ms: ttfb, rtt_ms: extra.connect ?? null },
+    ...(extra.probe ? { probe: "cache_bust" } : {}),
+  };
+}
+
+const TIMED = [
+  timed(1, 79.5, { connect: 38.2 }),
+  timed(2, 41.4),
+  timed(3, 42.0),
+  timed(4, 450.7, { probe: true }),
+];
+
+function rowCells(container: HTMLElement, label: string): string[] {
+  const th = Array.from(container.querySelectorAll("tbody th")).find((el) => el.textContent === label);
+  if (!th) return [];
+  return Array.from(th.parentElement!.querySelectorAll("td")).map((td) => td.textContent ?? "");
+}
+
+test("timing rows render from samples", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const { container, rerender } = render(<Progression verdict={v} samples={TIMED} />);
+  expect(rowCells(container, "TTFB")).toEqual(["79.5 ms", "41.4 ms", "42 ms", "450.7 ms"]);
+  expect(rowCells(container, "Server time")).toEqual(["41.3 ms", "3.2 ms", "3.8 ms", "412.5 ms"]);
+  expect(screen.getByText("cache-bust")).toBeInTheDocument();
+
+  rerender(<Progression verdict={v} samples={samples(3)} />);
+  expect(rowCells(container, "TTFB")).toEqual([]);
+  expect(rowCells(container, "Server time")).toEqual([]);
+});
+
+test("probe note when N > 6", () => {
+  const many = [timed(1, 79.5, { connect: 38.2 }), ...Array.from({ length: 7 }, (_, i) => timed(i + 2, 41))];
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  render(<Progression verdict={v} samples={[...many, timed(9, 450.7, { probe: true })]} />);
+  expect(screen.queryByText("cache-bust")).toBeNull();
+  const note = screen.getByText(/cache-bust probe/i);
+  expect(note.textContent).toContain("412.5 ms");
+});
+
+test("raw drawer probe tab", async () => {
+  const user = userEvent.setup();
+  const withProbe = [...TIMED.slice(0, 3), timed(4, 450.7, { probe: true, headers: [["x-probe-only", "abc"]] })];
+  render(<RawDrawer samples={withProbe} />);
+  await user.click(screen.getByRole("button", { name: "Cache-bust probe" }));
+  expect(screen.getByTestId("raw-body").textContent).toContain("x-probe-only");
+});

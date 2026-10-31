@@ -138,3 +138,19 @@ test("the subscription is opened once and closed on unmount", () => {
   unmount();
   expect(closeMock).toHaveBeenCalled();
 });
+
+// --- 1.2.0 final-review fix: the cache-bust probe is not a request step -------
+
+test("without router state, request steps come from samples minus the probe", () => {
+  renderRun();
+  const sample = (request: number, probe = false) => ({
+    request,
+    ok: true,
+    status: 200,
+    headers: [["age", "0"]],
+    ...(probe ? { probe: "cache_bust" } : {}),
+  });
+  emit({ stage: "sample", status: "completed", data: [sample(1), sample(2), sample(3), sample(4), sample(5, true)] });
+  expect(step("Request 4")).toBeInTheDocument();
+  expect(screen.queryByText("Request 5")).not.toBeInTheDocument();
+});

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { Badge } from "../../components";
 import type { BadgeTone } from "../../components";
-import type { Finding } from "./types";
+import type { Finding, TimingCheck } from "./types";
 
 // Section 03 findings — Security and Performance columns. Severity-sorted
 // (critical → warning → info); beyond the top 3 per column the rest collapse
@@ -45,20 +45,71 @@ function FindingCard({ f }: { f: Finding }) {
   );
 }
 
-function FindingsColumn({ title, findings }: { title: string; findings: Finding[] }) {
+// 1.2.0 — the LLM's timing assessment as a Performance card: a gap is a
+// warning (first among warnings); a consistent/insufficient note with a summary
+// is info; anything else renders nothing.
+export const TIMING_TITLE = "Timing doesn't match the headers";
+
+export function timingCard(timing: TimingCheck | undefined): Finding["severity"] | null {
+  if (!timing) return null;
+  if (timing.status === "gap") return "warning";
+  return timing.summary ? "info" : null;
+}
+
+function TimingCard({ timing, severity }: { timing: TimingCheck; severity: Finding["severity"] }) {
+  const sev = SEV[severity];
+  const title = timing.status === "gap" ? TIMING_TITLE : "Timing check";
+  return (
+    <div className={`card ${CARD[severity]}`}>
+      <div className="row1">
+        <Badge variant="sev" tone={sev.tone}>
+          {sev.label}
+        </Badge>
+        <span className="ttl">{title}</span>
+      </div>
+      <p>{timing.summary}</p>
+      <div className="hdr-lbl">LLM confidence · {timing.confidence}</div>
+      {timing.evidence.map((e, i) => (
+        <code key={i}>{e}</code>
+      ))}
+    </div>
+  );
+}
+
+type Item = { kind: "finding"; f: Finding; severity: Finding["severity"] } | { kind: "timing"; severity: Finding["severity"] };
+
+function FindingsColumn({
+  title,
+  findings,
+  timing,
+}: {
+  title: string;
+  findings: Finding[];
+  timing?: TimingCheck;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const sorted = [...findings].sort((a, b) => RANK[a.severity] - RANK[b.severity]);
+  const timingSeverity = timingCard(timing);
+  const items: Item[] = [
+    ...(timingSeverity ? [{ kind: "timing", severity: timingSeverity } as Item] : []),
+    ...findings.map((f) => ({ kind: "finding", f, severity: f.severity }) as Item),
+  ];
+  // Stable sort: the timing card leads its severity group.
+  const sorted = [...items].sort((a, b) => RANK[a.severity] - RANK[b.severity]);
   const hidden = sorted.length - COLLAPSE_AFTER;
   const visible = expanded ? sorted : sorted.slice(0, COLLAPSE_AFTER);
 
   return (
     <div className="find-col">
       <h4>
-        {title} <span className="count">{countLabel(findings)}</span>
+        {title} <span className="count">{countLabel(sorted.map((i) => ({ severity: i.severity }) as Finding))}</span>
       </h4>
-      {visible.map((f, i) => (
-        <FindingCard key={i} f={f} />
-      ))}
+      {visible.map((item, i) =>
+        item.kind === "timing" && timing ? (
+          <TimingCard key="timing" timing={timing} severity={item.severity} />
+        ) : item.kind === "finding" ? (
+          <FindingCard key={i} f={item.f} />
+        ) : null,
+      )}
       {hidden > 0 && !expanded && (
         <button type="button" className="show-all" onClick={() => setExpanded(true)}>
           show all ({sorted.length})
@@ -68,11 +119,19 @@ function FindingsColumn({ title, findings }: { title: string; findings: Finding[
   );
 }
 
-export function Findings({ security, performance }: { security: Finding[]; performance: Finding[] }) {
+export function Findings({
+  security,
+  performance,
+  timing,
+}: {
+  security: Finding[];
+  performance: Finding[];
+  timing?: TimingCheck;
+}) {
   return (
     <div className="find-grid">
       <FindingsColumn title="Security" findings={security} />
-      <FindingsColumn title="Performance" findings={performance} />
+      <FindingsColumn title="Performance" findings={performance} timing={timing} />
     </div>
   );
 }

@@ -16,6 +16,7 @@ export interface AnalysisOptions {
   request_count: number;
   interval_ms: number;
   warm: boolean;
+  cache_bust_probe: boolean;
   extra_request_headers: Record<string, string>;
   geo_hint: string | null;
 }

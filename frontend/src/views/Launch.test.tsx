@@ -59,6 +59,7 @@ test("valid URL + defaults -> exact POST body + navigates to live run", async ()
       request_count: 4,
       interval_ms: 0,
       warm: true,
+      cache_bust_probe: true,
       extra_request_headers: {},
       geo_hint: null,
     },
@@ -187,4 +188,15 @@ test("live models replace the static seed for the chosen model in the POST", asy
   const body = vi.mocked(createAnalysis).mock.calls[0][0];
   expect(body.provider).toBe("openrouter");
   expect(body.model).toBe("x-ai/grok-4"); // the live model, not a static default
+});
+
+test("launch sends cache_bust_probe (unchecked -> false)", async () => {
+  const user = userEvent.setup();
+  await renderLoaded();
+  await user.type(screen.getByLabelText("Target URL"), "https://x.test/");
+  await user.click(screen.getByText("Advanced"));
+  await user.click(screen.getByLabelText("Cache-bust probe (forced miss)"));
+  await user.click(screen.getByRole("button", { name: /run analysis/i }));
+  await waitFor(() => expect(createAnalysis).toHaveBeenCalled());
+  expect(vi.mocked(createAnalysis).mock.calls[0][0].options.cache_bust_probe).toBe(false);
 });

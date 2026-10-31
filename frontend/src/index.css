@@ -436,3 +436,16 @@ table.hist tbody tr:last-child td { border-bottom: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* 1.2.0 — cache-bust probe note under a compact (N>6) progression table */
+.prog-note { margin: 8px 0 0; font-family: var(--mono); font-size: 11px; color: var(--mid); }
+
+/* 1.2.0 — headline verdict confidence (layout C, operator decision): one line
+   above the tiles; the bar keeps the accent gradient (.conf-bar), the reason in
+   --mid. Tokens only — no new colours. */
+.verdict-conf { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; margin-top: 18px; }
+.verdict-conf .k { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--lo); }
+.verdict-conf .lvl { font-family: var(--disp); font-weight: 600; font-size: 15px; color: var(--hi); }
+.verdict-conf .conf-bar { width: 160px; margin-top: 0; }
+.verdict-conf .conf-reason { font-size: 12.5px; color: var(--mid); flex: 1 1 260px; }
+.verdict-conf + .verdict { margin-top: 12px; }

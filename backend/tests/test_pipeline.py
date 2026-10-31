@@ -169,6 +169,17 @@ async def test_sampler_total_failure_is_error_with_partial_evidence(repo):
     assert saved.verdict_json is None
 
 
+async def test_no_successful_samples_ignores_probe(repo):
+    report = repo.create(url=URL)
+    probe = {**_sample(3, 0), "probe": "cache_bust"}
+    samples = [_sample(1, 0, ok=False), _sample(2, 0, ok=False), probe]
+    await run_analysis(report.id, URL, {}, repo=repo, emit=lambda e: None,
+                       deps=make_deps(samples=samples))
+    saved = repo.get(report.id)
+    assert saved.status == "error"
+    assert "no successful samples" in saved.error
+
+
 # --- Scenario 4 ---------------------------------------------------------------
 
 async def test_llm_failure_degrades_but_keeps_evidence(repo):

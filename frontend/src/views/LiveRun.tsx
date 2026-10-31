@@ -16,6 +16,7 @@ interface Sample {
   http_version?: string;
   status?: number;
   headers: [string, string][];
+  probe?: string; // 1.2.0 cache-bust probe marker — not one of the N requests
 }
 
 interface LiveState {
@@ -74,7 +75,8 @@ interface Step {
 // sample event reveals N.
 function buildSteps(state: LiveState, requestCount: number | null): Step[] {
   const sample = state.stages.sample;
-  const n = requestCount ?? state.samples?.length ?? null;
+  // The cache-bust probe (1.2.0) is not one of the N requests.
+  const n = requestCount ?? state.samples?.filter((s) => !s.probe).length ?? null;
   const requestSteps: Step[] =
     n != null
       ? Array.from({ length: n }, (_, i) => ({ id: `req-${i + 1}`, label: `Request ${i + 1}`, status: sample }))

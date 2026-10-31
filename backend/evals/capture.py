@@ -39,7 +39,10 @@ def _redact(link: str) -> str:
 def non_2xx_summary(samples: list) -> str | None:
     """``"403×4"``-style status summary when no sample returned 2xx, else None.
     A plain HTTP status class — the evidence may be a block page or redirect."""
-    statuses = [s.get("status") for s in samples if isinstance(s, dict) and s.get("ok")]
+    statuses = [
+        s.get("status") for s in samples
+        if isinstance(s, dict) and s.get("ok") and not s.get("probe")
+    ]
     if any(isinstance(st, int) and 200 <= st < 300 for st in statuses):
         return None
     counts = Counter(statuses)

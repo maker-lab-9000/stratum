@@ -68,3 +68,19 @@ async def test_fake_fail_mode_degrades(monkeypatch):
     out = await analyze(BUNDLE, "fake", "fake-1")
     assert out["verdict_json"]["status"] == "unavailable"
     assert out["llm_json"] is None
+
+
+def test_fake_emits_timing_check():
+    import json as _json
+    from pathlib import Path as _Path
+
+    from app.llm.fake import _verdict_from_bundle
+    from app.llm.schema import StructuredResult
+    from app.pipeline.validator import validate_verdict
+
+    bundle = _json.loads((_Path(__file__).parent / "fixtures/bundle/golden_bundle.json").read_text())
+    verdict = _verdict_from_bundle(bundle)
+    assert verdict["cache_verdict"]["timing_check"]["status"] == "insufficient"
+    assert isinstance(verdict["cache_verdict"]["confidence_reason"], str)
+    result = validate_verdict(StructuredResult.model_validate(verdict), bundle)
+    assert result.ok, result.flags

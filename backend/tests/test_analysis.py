@@ -44,6 +44,9 @@ VALID_RESULT = {
             {"request": 1, "state": "MISS", "evidence_headers": ["X-Cache: TCP_MISS from a23-fra"]},
             {"request": 2, "state": "MISS", "evidence_headers": ["X-Cache: TCP_MISS from a23-fra"]},
         ],
+        "confidence_reason": "",
+        "timing_check": {"status": "insufficient", "summary": "", "hidden_layer_suspected": False,
+                         "confidence": "low", "evidence": []},
     },
     "overall_summary": "CDN bypass: Akamai edge is not storing the object; served from the Apache Dispatcher.",
     "segment_narration": [
@@ -241,3 +244,79 @@ async def test_live_real_model_produces_valid_result():
     # The bypass story: Akamai edge with flat Age 0 / no-cache should not be a HIT.
     assert result.cache_verdict.provider  # some provider identified
     assert result.overall_summary
+
+
+# --- 1.2.0: timing corroboration ----------------------------------------------
+
+import copy  # noqa: E402
+
+
+from app.llm.analysis import parse_structured_result  # noqa: E402
+
+
+def test_parse_with_timing_check():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["timing_check"] = {
+        "status": "gap", "summary": "s", "hidden_layer_suspected": True,
+        "confidence": "medium", "evidence": ["edge_rtt_ms: 38.2"],
+    }
+    data["cache_verdict"]["confidence_reason"] = "r"
+    cv = parse_structured_result(json.dumps(data)).cache_verdict
+    assert cv.confidence_reason == "r"
+    assert cv.timing_check.status == "gap"
+    assert cv.timing_check.hidden_layer_suspected is True
+    assert cv.timing_check.evidence == ["edge_rtt_ms: 38.2"]
+    # A bad status no longer fails the parse (final-review fix: never lose the
+    # verdict over the new fields) — the timing_check is dropped and marked.
+    data["cache_verdict"]["timing_check"]["status"] = "maybe"
+    bad = parse_structured_result(json.dumps(data)).cache_verdict
+    assert bad.timing_check is None and bad.timing_check_error == "malformed"
+
+
+def test_parse_without_new_fields():
+    data = copy.deepcopy(VALID_RESULT)
+    del data["cache_verdict"]["timing_check"], data["cache_verdict"]["confidence_reason"]
+    cv = parse_structured_result(json.dumps(data)).cache_verdict
+    assert cv.timing_check is None
+    assert cv.confidence_reason == ""
+
+
+def test_prompt_timing_guidance():
+    for marker in ("timing_check", "confidence_reason", "timing.facts", "warm server_ms",
+                   "cache_bust", "clearly exceeds the warm spread",
+                   "Timing never adds, removes, or re-states layers"):
+        assert marker in SYSTEM_PROMPT, marker
+    assert "Do not infer cache layers from traceroute hops." in SYSTEM_PROMPT
+
+
+
+# (field, value, expected timing_check: "malformed" -> dropped + flagged later,
+#  or a dict of attributes the coerced TimingCheck must have)
+_MALFORMED = {
+    "reason-null": ("confidence_reason", None, None),
+    "status-unknown": ("timing_check", {"status": "inconclusive", "summary": "x"}, "malformed"),
+    "confidence-unknown": ("timing_check", {"status": "gap", "confidence": "moderate"}, "malformed"),
+    "evidence-null": ("timing_check", {"status": "gap", "evidence": None}, {"evidence": []}),
+    "summary-null": ("timing_check", {"status": "consistent", "summary": None}, {"summary": ""}),
+    "empty-object": ("timing_check", {}, "malformed"),
+    "not-an-object": ("timing_check", "gap", "malformed"),
+}
+
+
+@pytest.mark.parametrize("field,value,expected", list(_MALFORMED.values()), ids=list(_MALFORMED))
+def test_malformed_new_fields_do_not_lose_verdict(field, value, expected):
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"][field] = value
+    cv = parse_structured_result(json.dumps(data)).cache_verdict  # must not raise
+    assert isinstance(cv.confidence_reason, str)
+    if expected == "malformed":
+        assert cv.timing_check is None
+        assert cv.timing_check_error == "malformed"
+    elif isinstance(expected, dict):
+        for attr, want in expected.items():
+            assert getattr(cv.timing_check, attr) == want
+
+
+def test_prompt_probe_header_citation_rule():
+    assert "only inside `timing_check`" in SYSTEM_PROMPT
+    assert "cite the probe's headers as plain" in SYSTEM_PROMPT

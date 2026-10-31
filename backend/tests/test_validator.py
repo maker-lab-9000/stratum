@@ -151,3 +151,125 @@ def test_verdict_json_embeds_validation_report():
     assert vj["validation"] == {"ok": True, "flags": []}
     # Serializable.
     assert json.loads(json.dumps(vj)) == vj
+
+
+# --- 1.2.0: timing citations, probe exclusion, honest headline -----------------
+
+from app.pipeline.validator import DISCARDED_SUMMARY, NOTE_SERVING, NOTE_TIMING  # noqa: E402
+
+_FACTS = ["edge_rtt_ms: 38.2", "request 2 server_ms: 3.2", "cache_bust server_ms: 412.5"]
+
+
+def _timed_bundle() -> dict:
+    bundle = copy.deepcopy(BUNDLE)
+    bundle["timing"] = {"edge_rtt_ms": 38.2, "requests": [], "cache_bust": None, "facts": list(_FACTS)}
+    probe = copy.deepcopy(bundle["samples"][0])
+    probe.update({"request": 5, "probe": "cache_bust",
+                  "headers": probe["headers"] + [["x-probe-only", "abc123"]]})
+    bundle["samples"].append(probe)
+    return bundle
+
+
+def _with_timing(evidence, status="gap", reason="timing disagrees"):
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["confidence_reason"] = reason
+    data["cache_verdict"]["timing_check"] = {
+        "status": status, "summary": "s", "hidden_layer_suspected": True,
+        "confidence": "medium", "evidence": evidence,
+    }
+    return StructuredResult.model_validate(data)
+
+
+def _timing_flags(result):
+    return [f for f in result.flags if f.path == "cache_verdict.timing_check"]
+
+
+def test_probe_headers_not_claim_evidence():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["layers"][0]["evidence_headers"] = ["x-probe-only: abc123"]
+    result = validate_verdict(StructuredResult.model_validate(data), _timed_bundle())
+    assert result.verdict.cache_verdict.layers[0].state == "UNKNOWN"
+    flag = next(f for f in result.flags if f.path == "cache_verdict.layers[0].state")
+    # Final review fix: the reason says where the header actually is.
+    assert flag.reason == "cited header appears only on the cache-bust probe"
+
+
+def test_timing_check_valid_citations():
+    result = validate_verdict(_with_timing(["edge_rtt_ms: 38.2", "x-probe-only: abc123"]), _timed_bundle())
+    tc = result.verdict.cache_verdict.timing_check
+    assert tc.status == "gap" and tc.hidden_layer_suspected is True
+    assert _timing_flags(result) == []
+
+
+def test_timing_citation_must_be_exact_fact():
+    result = validate_verdict(_with_timing(["edge_rtt_ms: 38.2", "request 2 server_ms: 412.5"]),
+                              _timed_bundle())
+    cv = result.verdict.cache_verdict
+    assert cv.timing_check.status == "insufficient"
+    assert cv.timing_check.hidden_layer_suspected is False
+    assert _timing_flags(result)
+    assert cv.confidence_reason.endswith(NOTE_TIMING)
+    # Final review fix: a discarded assessment no longer shows its claims.
+    assert cv.timing_check.summary == DISCARDED_SUMMARY
+    assert cv.timing_check.confidence == "low"
+    assert cv.timing_check.evidence == []
+
+
+def test_timing_check_without_any_fact_fails():
+    result = validate_verdict(_with_timing(["x-probe-only: abc123"]), _timed_bundle())
+    assert result.verdict.cache_verdict.timing_check.status == "insufficient"
+    assert _timing_flags(result)
+
+
+def test_insufficient_timing_check_needs_no_evidence():
+    result = validate_verdict(_with_timing([], status="insufficient", reason=""), _timed_bundle())
+    assert result.verdict.cache_verdict.timing_check.status == "insufficient"
+    assert _timing_flags(result) == []
+    assert result.verdict.cache_verdict.confidence_reason == ""
+
+
+def test_missing_timing_check_defaults_and_flags():
+    data = copy.deepcopy(VALID_RESULT)
+    del data["cache_verdict"]["timing_check"]
+    data["cache_verdict"]["confidence_reason"] = "as reported"
+    result = validate_verdict(StructuredResult.model_validate(data), _timed_bundle())
+    cv = result.verdict.cache_verdict
+    assert cv.timing_check.status == "insufficient"
+    assert [f.reason for f in _timing_flags(result)] == ["not provided"]
+    assert cv.confidence_reason == "as reported"
+    assert result.verdict_json()["timing_check"]["status"] == "insufficient"
+
+
+def test_serving_cascade_appends_note():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["confidence_reason"] = "model reason"
+    data["cache_verdict"]["layers"][1]["evidence_headers"] = ["X-Fabricated: nope"]
+    result = validate_verdict(StructuredResult.model_validate(data), _timed_bundle())
+    cv = result.verdict.cache_verdict
+    assert cv.confidence == "low"
+    assert cv.confidence_reason == "model reason" + NOTE_SERVING
+
+
+
+def test_fact_shape_catches_hyphenated_fabrication():
+    # Loose rule 6 would accept this (it wraps a captured X-Cache value); any
+    # "<x>_ms: <number>" citation must be an exact fact.
+    citation = "cache-bust server_ms: 999.9 (X-Cache: TCP_MISS from a23-fra)"
+    result = validate_verdict(_with_timing(["edge_rtt_ms: 38.2", citation]), _timed_bundle())
+    assert result.verdict.cache_verdict.timing_check.status == "insufficient"
+    assert any(f.citation == citation for f in _timing_flags(result))
+
+
+def test_plain_probe_header_citation_accepted_in_timing_check():
+    result = validate_verdict(_with_timing(["cache_bust server_ms: 412.5", "Age: 0"]), _timed_bundle())
+    assert result.verdict.cache_verdict.timing_check.status == "gap"
+    assert _timing_flags(result) == []
+
+
+def test_malformed_timing_check_flagged_as_malformed():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["timing_check"] = {"status": "inconclusive"}
+    result = validate_verdict(StructuredResult.model_validate(data), _timed_bundle())
+    assert result.verdict.cache_verdict.timing_check.status == "insufficient"
+    assert [f.reason for f in _timing_flags(result)] == ["malformed"]
+    assert "timing_check_error" not in result.verdict_json()

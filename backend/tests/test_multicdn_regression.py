@@ -90,6 +90,9 @@ CORRECTED = {
             {"request": 1, "state": "HIT", "evidence_headers": ["age: 226"]},
             {"request": 2, "state": "HIT", "evidence_headers": ["age: 226"]},
         ],
+        "confidence_reason": "",
+        "timing_check": {"status": "insufficient", "summary": "", "hidden_layer_suspected": False,
+                         "confidence": "low", "evidence": []},
     },
     "overall_summary": "CloudFront edge passes through (MISS); a downstream Fastly cache serves the object (age 226).",
     "segment_narration": [

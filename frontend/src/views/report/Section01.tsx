@@ -5,7 +5,7 @@ import { Geomap } from "./Geomap";
 import { HopLadder } from "./HopLadder";
 import { MeasurementSeam } from "./MeasurementSeam";
 import { SegmentNarration } from "./SegmentNarration";
-import type { CacheVerdict, Dns, Hop, Segment } from "./types";
+import type { CacheVerdict, Dns, Hop, Seam, Segment } from "./types";
 import { isDegraded } from "./types";
 
 // Section 01 — Network route: DNS panel + geomap, hop ladder, 3-segment
@@ -13,7 +13,7 @@ import { isDegraded } from "./types";
 // the verdict is degraded (§8.3: a report never renders empty).
 export function Section01({ report }: { report: Report }) {
   const dns = report.dns_json as unknown as Dns | null;
-  const traceroute = report.traceroute_json as unknown as { hops?: Hop[] } | null;
+  const traceroute = report.traceroute_json as unknown as { hops?: Hop[]; seam?: Seam } | null;
   const hops = traceroute?.hops ?? [];
   const verdict = isDegraded(report.verdict_json)
     ? null
@@ -29,7 +29,7 @@ export function Section01({ report }: { report: Report }) {
       </div>
       <HopLadder hops={hops} verdict={verdict} />
       <SegmentNarration segments={segments} />
-      <MeasurementSeam hops={hops} />
+      <MeasurementSeam hops={hops} seam={traceroute?.seam} />
     </>
   );
 }

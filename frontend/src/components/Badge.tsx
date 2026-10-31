@@ -10,7 +10,8 @@ export type BadgeVariant =
   | "sev"
   | "bhv"
   | "state"
-  | "unverified";
+  | "unverified"
+  | "timing-gap";
 
 export type BadgeTone =
   | "hit"
@@ -43,6 +44,13 @@ const BASE: Record<BadgeVariant, string> = {
   bhv: "bhv",
   state: "tag",
   unverified: "unverified",
+  // 1.2.0 — amber dashed anomaly tag (same family as .unverified).
+  "timing-gap": "unverified timing-gap",
+};
+
+const DEFAULT_TEXT: Partial<Record<BadgeVariant, string>> = {
+  unverified: "unverified",
+  "timing-gap": "timing gap",
 };
 
 export function Badge({ variant, tone, keep, className, children }: BadgeProps) {
@@ -52,7 +60,7 @@ export function Badge({ variant, tone, keep, className, children }: BadgeProps) 
   if (className) classes.push(className);
   return (
     <span className={classes.join(" ")}>
-      {children ?? (variant === "unverified" ? "unverified" : null)}
+      {children ?? DEFAULT_TEXT[variant] ?? null}
     </span>
   );
 }
