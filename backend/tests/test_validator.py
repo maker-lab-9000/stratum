@@ -20,6 +20,7 @@ from pathlib import Path
 from app.llm.schema import StructuredResult
 from app.pipeline.validator import _EvidenceIndex, validate_verdict
 from tests.test_analysis import VALID_RESULT
+from tests.vendor_tokens import FORBIDDEN_VENDOR_TOKENS
 
 BUNDLE = json.loads(
     (Path(__file__).parent / "fixtures" / "bundle" / "golden_bundle.json").read_text()
@@ -104,13 +105,7 @@ def test_no_vendor_names_in_source():
     source = (
         Path(__file__).resolve().parents[1] / "app" / "pipeline" / "validator.py"
     ).read_text().lower()
-    forbidden = [
-        "akamai", "cloudflare", "fastly", "cloudfront", "varnish", "dispatcher",
-        "nginx", "x-cache", "cf-ray", "cf-cache-status", "x-served-by",
-        "x-dispatcher", "x-amz-cf-id", "x-varnish", "x-cache-status", "edgekey",
-        "akamaiedge", "cloudfront", "server-timing",
-    ]
-    present = [token for token in forbidden if token in source]
+    present = [token for token in FORBIDDEN_VENDOR_TOKENS if token in source]
     assert present == [], f"vendor/header signatures leaked into the validator: {present}"
 
 

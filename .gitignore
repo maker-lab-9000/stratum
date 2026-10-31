@@ -37,3 +37,6 @@ data/
 frontend/test-results/
 frontend/playwright-report/
 framework/.playwright/
+
+# Eval run results (local inspection only)
+backend/evals/runs/
