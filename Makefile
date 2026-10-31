@@ -2,7 +2,8 @@
 .PHONY: install install-backend install-frontend \
         test test-backend test-frontend \
         dev-backend dev-frontend build-frontend clean \
-        docker-build docker-up docker-down
+        docker-build docker-up docker-down \
+        eval eval-capture
 
 install: install-backend install-frontend ## Install both sides
 
@@ -50,3 +51,10 @@ e2e: ## Full docker-compose e2e: real api + fake LLM + controlled target
 
 clean:
 	rm -rf backend/.venv backend/.pytest_cache frontend/node_modules frontend/dist
+
+## --- Eval corpus (backend/evals) ------------------------------------------
+eval-capture: ## Freeze a report into an eval case: make eval-capture REPORT=<link> NAME=<case>
+	@cd backend && uv run $(if $(wildcard .env),--env-file ../.env) python -m evals capture "$(REPORT)" --name "$(NAME)"
+
+eval: ## Replay eval cases: make eval MODELS="anthropic:<model> openrouter:<model>"
+	cd backend && uv run $(if $(wildcard .env),--env-file ../.env) python -m evals run $(foreach m,$(MODELS),--model $(m))
