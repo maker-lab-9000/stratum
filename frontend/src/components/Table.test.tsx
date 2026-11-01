@@ -47,3 +47,17 @@ test("served row is styled per-variant (layers vs prog)", () => {
   );
   expect(prog.container.querySelector("tbody tr")!.className).toBe("served-row");
 });
+
+test("the scroll wrapper is a focusable, labelled region (keyboard can scroll it)", () => {
+  const { container } = render(
+    <Table variant="prog" head={["a"]} label="Measured values">
+      <TableRow>
+        <td>1</td>
+      </TableRow>
+    </Table>,
+  );
+  const wrap = container.querySelector(".tbl-wrap") as HTMLElement;
+  expect(wrap).toHaveAttribute("tabindex", "0");
+  expect(wrap).toHaveAttribute("role", "region");
+  expect(wrap).toHaveAttribute("aria-label", "Measured values");
+});

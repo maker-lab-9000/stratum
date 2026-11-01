@@ -273,3 +273,33 @@ def test_malformed_timing_check_flagged_as_malformed():
     assert result.verdict.cache_verdict.timing_check.status == "insufficient"
     assert [f.reason for f in _timing_flags(result)] == ["malformed"]
     assert "timing_check_error" not in result.verdict_json()
+
+
+# --- 1.3.0: failed citations force per-claim confidence to low -----------------
+
+def test_failed_layer_citation_sets_low_confidence():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["layers"][1]["evidence_headers"] = ["X-Fabricated: nope"]
+    data["cache_verdict"]["layers"][1]["confidence"] = "high"
+    layer = validate_verdict(StructuredResult.model_validate(data), BUNDLE).verdict.cache_verdict.layers[1]
+    assert layer.state == "UNKNOWN"
+    assert layer.confidence == "low"
+
+
+def test_failed_provider_evidence_sets_low_confidence():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["provider_evidence"] = ["X-Fabricated: nope"]
+    data["cache_verdict"]["provider_confidence"] = "high"
+    cv = validate_verdict(StructuredResult.model_validate(data), BUNDLE).verdict.cache_verdict
+    assert cv.provider == "UNKNOWN"
+    assert cv.provider_confidence == "low"
+
+
+def test_failed_finding_citation_sets_low_confidence():
+    data = copy.deepcopy(VALID_RESULT)
+    data["performance_findings"][0].update({"evidence_header": "X-Fake: nope", "confidence": "high"})
+    data["security_findings"][0]["confidence"] = "high"  # bare-name absence finding
+    result = validate_verdict(StructuredResult.model_validate(data), BUNDLE)
+    assert any(f.path == "performance_findings[0].evidence_header" for f in result.flags)
+    assert result.verdict.performance_findings[0].confidence == "low"
+    assert result.verdict.security_findings[0].confidence == "high"

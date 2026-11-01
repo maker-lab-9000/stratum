@@ -75,6 +75,19 @@ def _verdict_from_bundle(bundle: dict) -> dict:
             "caches": True,
             "state": "HIT",
             "evidence_headers": [serving],
+            "confidence": "high",
+            "location": "",
+        },
+        {
+            "layer_name": "Origin",
+            "vendor": "Fake origin",
+            "cache_type": "origin",
+            "role": "origin",
+            "caches": False,
+            "state": "UNKNOWN",
+            "evidence_headers": [serving],
+            "confidence": "low",
+            "location": "",
         },
     ]
     sample_states = [
@@ -93,6 +106,9 @@ def _verdict_from_bundle(bundle: dict) -> dict:
             "layers": layers,
             "sample_states": sample_states,
             "confidence_reason": "",
+            "headline": "Served from the edge cache.",
+            "headline_detail": "Recorded fake verdict for the e2e stack.",
+            "provider_confidence": "high",
             "timing_check": {
                 "status": "insufficient",
                 "summary": "fake provider does not assess timing",

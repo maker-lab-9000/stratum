@@ -1,13 +1,22 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { expect, test } from "vitest";
 
 import { ComponentsGallery } from "./Components";
 
-test("gallery renders every primitive group without error", () => {
-  render(<ComponentsGallery />);
-  expect(screen.getByText("Design system · primitives")).toBeInTheDocument();
-  // A sampling of primitive states are present.
-  expect(screen.getByText("Bypassed")).toBeInTheDocument(); // warn tile
-  expect(screen.getAllByText("UNKNOWN").length).toBeGreaterThan(0); // unknown tags
-  expect(screen.getByText("Verdict unavailable.")).toBeInTheDocument(); // degraded banner
+test("gallery renders the current primitives", () => {
+  render(
+    <MemoryRouter>
+      <ComponentsGallery />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("heading", { name: "Design system" })).toBeInTheDocument();
+  for (const level of ["high", "medium", "low"]) {
+    expect(screen.getAllByRole("img", { name: `Confidence: ${level}` }).length).toBeGreaterThanOrEqual(2);
+  }
+  expect(screen.getByRole("img", { name: "Not rated" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "History" })).toBeInTheDocument(); // TopBar
+  expect(screen.getByText("timing gap")).toBeInTheDocument();
+  expect(screen.getByText("unverified")).toBeInTheDocument();
+  expect(screen.queryByText("Verdict unavailable.")).toBeNull(); // old banner gone
 });

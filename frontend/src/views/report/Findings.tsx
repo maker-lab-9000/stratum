@@ -1,122 +1,72 @@
 import { useState } from "react";
 
-import { Badge } from "../../components";
-import type { BadgeTone } from "../../components";
+import { ConfidenceMeter } from "../../components";
 import type { Finding, TimingCheck } from "./types";
 
-// Section 03 findings — Security and Performance columns. Severity-sorted
-// (critical → warning → info); beyond the top 3 per column the rest collapse
-// behind a "show all (N)" control (§8.4). Amber is reserved for warnings; a raw
-// MISS is never dressed as a finding here.
+// What to look at (1.3.0): security and performance findings as ONE list,
+// severity-sorted (critical → warning → info), each with its category, its
+// cited evidence, and the model's confidence. The timing assessment joins the
+// list (gap → warning, first among warnings; a consistent/insufficient note
+// with a summary → info). Beyond the first 5, "Show all (N)".
 const RANK: Record<Finding["severity"], number> = { critical: 0, warning: 1, info: 2 };
-const SEV: Record<Finding["severity"], { tone: BadgeTone; label: string }> = {
-  critical: { tone: "crit", label: "Critical" },
-  warning: { tone: "warn", label: "Warning" },
-  info: { tone: "info", label: "Info" },
+const SEV: Record<Finding["severity"], { cls: string; label: string }> = {
+  critical: { cls: "crit", label: "Critical" },
+  warning: { cls: "warn", label: "Warning" },
+  info: { cls: "info", label: "Info" },
 };
-const CARD: Record<Finding["severity"], string> = { critical: "crit", warning: "warn", info: "info" };
-const COLLAPSE_AFTER = 3;
-
-function countLabel(findings: Finding[]): string {
-  const parts: string[] = [];
-  for (const sev of ["critical", "warning", "info"] as const) {
-    const c = findings.filter((f) => f.severity === sev).length;
-    if (c) parts.push(`${c} ${sev}`);
-  }
-  return parts.length ? `· ${parts.join(" · ")}` : "· none";
-}
-
-function FindingCard({ f }: { f: Finding }) {
-  const sev = SEV[f.severity] ?? SEV.info;
-  // A bare header name (no value) reads as an expected-but-absent header.
-  const present = f.evidence_header.includes(":");
-  return (
-    <div className={`card ${CARD[f.severity] ?? "info"}`}>
-      <div className="row1">
-        <Badge variant="sev" tone={sev.tone}>
-          {sev.label}
-        </Badge>
-        <span className="ttl">{f.title}</span>
-      </div>
-      <p>{f.description}</p>
-      <div className="hdr-lbl">{present ? "Response header" : "Expected, not present"}</div>
-      <code>{f.evidence_header}</code>
-    </div>
-  );
-}
-
-// 1.2.0 — the LLM's timing assessment as a Performance card: a gap is a
-// warning (first among warnings); a consistent/insufficient note with a summary
-// is info; anything else renders nothing.
+const COLLAPSE_AFTER = 5;
 export const TIMING_TITLE = "Timing doesn't match the headers";
 
+/** Severity of the timing row, or null when it renders nothing. */
 export function timingCard(timing: TimingCheck | undefined): Finding["severity"] | null {
   if (!timing) return null;
   if (timing.status === "gap") return "warning";
   return timing.summary ? "info" : null;
 }
 
-function TimingCard({ timing, severity }: { timing: TimingCheck; severity: Finding["severity"] }) {
-  const sev = SEV[severity];
-  const title = timing.status === "gap" ? TIMING_TITLE : "Timing check";
-  return (
-    <div className={`card ${CARD[severity]}`}>
-      <div className="row1">
-        <Badge variant="sev" tone={sev.tone}>
-          {sev.label}
-        </Badge>
-        <span className="ttl">{title}</span>
-      </div>
-      <p>{timing.summary}</p>
-      <div className="hdr-lbl">LLM confidence · {timing.confidence}</div>
-      {timing.evidence.map((e, i) => (
-        <code key={i}>{e}</code>
-      ))}
-    </div>
-  );
+interface Row {
+  key: string;
+  severity: Finding["severity"];
+  category: "Security" | "Performance";
+  title: string;
+  description: string;
+  evidence: string[];
+  confidence: string | null | undefined;
+  absent: boolean; // a bare header name = expected but not present
 }
 
-type Item = { kind: "finding"; f: Finding; severity: Finding["severity"] } | { kind: "timing"; severity: Finding["severity"] };
-
-function FindingsColumn({
-  title,
-  findings,
-  timing,
-}: {
-  title: string;
-  findings: Finding[];
-  timing?: TimingCheck;
-}) {
-  const [expanded, setExpanded] = useState(false);
+function rows(security: Finding[], performance: Finding[], timing?: TimingCheck): Row[] {
+  const fromFinding = (category: Row["category"]) => (f: Finding, i: number): Row => ({
+    key: `${category}-${i}`,
+    severity: f.severity,
+    category,
+    title: f.title,
+    description: f.description,
+    evidence: [f.evidence_header],
+    confidence: f.confidence,
+    absent: !f.evidence_header.includes(":"),
+  });
   const timingSeverity = timingCard(timing);
-  const items: Item[] = [
-    ...(timingSeverity ? [{ kind: "timing", severity: timingSeverity } as Item] : []),
-    ...findings.map((f) => ({ kind: "finding", f, severity: f.severity }) as Item),
+  const list: Row[] = [
+    ...(timing && timingSeverity
+      ? [
+          {
+            key: "timing",
+            severity: timingSeverity,
+            category: "Performance" as const,
+            title: timing.status === "gap" ? TIMING_TITLE : "Timing check",
+            description: timing.summary,
+            evidence: timing.evidence,
+            confidence: timing.status === "insufficient" ? null : timing.confidence,
+            absent: false,
+          },
+        ]
+      : []),
+    ...security.map(fromFinding("Security")),
+    ...performance.map(fromFinding("Performance")),
   ];
-  // Stable sort: the timing card leads its severity group.
-  const sorted = [...items].sort((a, b) => RANK[a.severity] - RANK[b.severity]);
-  const hidden = sorted.length - COLLAPSE_AFTER;
-  const visible = expanded ? sorted : sorted.slice(0, COLLAPSE_AFTER);
-
-  return (
-    <div className="find-col">
-      <h4>
-        {title} <span className="count">{countLabel(sorted.map((i) => ({ severity: i.severity }) as Finding))}</span>
-      </h4>
-      {visible.map((item, i) =>
-        item.kind === "timing" && timing ? (
-          <TimingCard key="timing" timing={timing} severity={item.severity} />
-        ) : item.kind === "finding" ? (
-          <FindingCard key={i} f={item.f} />
-        ) : null,
-      )}
-      {hidden > 0 && !expanded && (
-        <button type="button" className="show-all" onClick={() => setExpanded(true)}>
-          show all ({sorted.length})
-        </button>
-      )}
-    </div>
-  );
+  // Stable sort: the timing row leads its severity group.
+  return list.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
 }
 
 export function Findings({
@@ -128,10 +78,39 @@ export function Findings({
   performance: Finding[];
   timing?: TimingCheck;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const all = rows(security, performance, timing);
+  const visible = expanded ? all : all.slice(0, COLLAPSE_AFTER);
+
   return (
-    <div className="find-grid">
-      <FindingsColumn title="Security" findings={security} />
-      <FindingsColumn title="Performance" findings={performance} timing={timing} />
+    <div className="findings">
+      {visible.map((r) => {
+        const sev = SEV[r.severity] ?? SEV.info;
+        return (
+          <div key={r.key} className={`finding ${sev.cls}`} data-title={r.title}>
+            <div className="finding-sev">
+              <span className="sev-word">{sev.label}</span>
+              <span className="finding-cat">{r.category}</span>
+            </div>
+            <div className="finding-body">
+              <h3 className="finding-title">{r.title}</h3>
+              {r.description && <p>{r.description}</p>}
+              {r.evidence.map((e, i) => (
+                <code key={i}>{e}</code>
+              ))}
+              {r.absent && <span className="note"> expected, not present</span>}
+            </div>
+            <div className="finding-rate">
+              <ConfidenceMeter level={r.confidence} />
+            </div>
+          </div>
+        );
+      })}
+      {all.length > COLLAPSE_AFTER && !expanded && (
+        <button type="button" className="btn-quiet show-all" onClick={() => setExpanded(true)}>
+          Show all ({all.length})
+        </button>
+      )}
     </div>
   );
 }

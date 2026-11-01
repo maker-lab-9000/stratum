@@ -19,6 +19,23 @@ Role = Literal[
 State = Literal["HIT", "MISS", "PASS", "UNKNOWN"]
 Severity = Literal["critical", "warning", "info"]
 TimingStatus = Literal["consistent", "gap", "insufficient"]
+_CONFIDENCES = ("high", "medium", "low")
+
+
+def _normalize_confidence(value):
+    """'High' / ' medium ' → 'high' / 'medium'; other values pass through."""
+    return value.strip().lower() if isinstance(value, str) else value
+
+
+def _optional_confidence(value):
+    """1.3.0 per-claim confidence: anything outside the three levels → None
+    (unrated), never a parse failure. Case and surrounding spaces are ignored."""
+    value = _normalize_confidence(value)
+    return value if value in _CONFIDENCES else None
+
+
+def _blank_if_none(value):
+    return "" if value is None else value
 
 
 class Layer(BaseModel):
@@ -29,6 +46,19 @@ class Layer(BaseModel):
     caches: bool
     state: State
     evidence_headers: list[str]
+    # 1.3.0 — optional, coerced; an unrated layer is None, never a default.
+    confidence: Confidence | None = None
+    location: str = ""
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _confidence(cls, value):
+        return _optional_confidence(value)
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _location(cls, value):
+        return _blank_if_none(value)
 
 
 class SampleState(BaseModel):
@@ -51,6 +81,11 @@ class TimingCheck(BaseModel):
     def _null_summary(cls, value):
         return "" if value is None else value
 
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _confidence_case(cls, value):
+        return _normalize_confidence(value)
+
     @field_validator("evidence", mode="before")
     @classmethod
     def _null_evidence(cls, value):
@@ -70,14 +105,28 @@ class CacheVerdict(BaseModel):
     # validator fills a missing timing_check with an "insufficient" default.
     confidence_reason: str = ""
     timing_check: TimingCheck | None = None
+    # 1.3.0 — story fields + provider confidence (optional, coerced).
+    headline: str = ""
+    headline_detail: str = ""
+    provider_confidence: Confidence | None = None
     # Set when the model sent an unusable timing_check (dropped instead of
     # failing the whole verdict); the validator flags it. Never serialized.
     timing_check_error: str | None = Field(default=None, exclude=True)
 
-    @field_validator("confidence_reason", mode="before")
+    @field_validator("confidence_reason", "headline", "headline_detail", mode="before")
     @classmethod
-    def _null_reason(cls, value):
-        return "" if value is None else value
+    def _null_text(cls, value):
+        return _blank_if_none(value)
+
+    @field_validator("provider_confidence", mode="before")
+    @classmethod
+    def _provider_conf(cls, value):
+        return _optional_confidence(value)
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _verdict_confidence_case(cls, value):
+        return _normalize_confidence(value)
 
     @model_validator(mode="before")
     @classmethod
@@ -105,6 +154,12 @@ class Finding(BaseModel):
     title: str
     description: str
     evidence_header: str
+    confidence: Confidence | None = None  # 1.3.0
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _confidence(cls, value):
+        return _optional_confidence(value)
 
 
 class StructuredResult(BaseModel):

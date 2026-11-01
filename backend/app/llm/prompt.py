@@ -39,7 +39,9 @@ OUTPUT_SCHEMA = """\
         "role": "client|edge|shield|security|load_balancer|reverse_proxy|app_cache|origin|unknown",
         "caches": true,
         "state": "HIT|MISS|PASS|UNKNOWN",
-        "evidence_headers": ["string"] }
+        "evidence_headers": ["string"],
+        "confidence": "high|medium|low",
+        "location": "string" }
     ],
     "sample_states": [
       { "request": 1,
@@ -47,6 +49,9 @@ OUTPUT_SCHEMA = """\
         "evidence_headers": ["string"] }
     ],
     "confidence_reason": "string",
+    "headline": "string",
+    "headline_detail": "string",
+    "provider_confidence": "high|medium|low",
     "timing_check": {
       "status": "consistent|gap|insufficient",
       "summary": "string",
@@ -66,13 +71,15 @@ OUTPUT_SCHEMA = """\
     { "severity": "critical|warning|info",
       "title": "string",
       "description": "string",
-      "evidence_header": "string" }
+      "evidence_header": "string",
+      "confidence": "high|medium|low" }
   ],
   "performance_findings": [
     { "severity": "critical|warning|info",
       "title": "string",
       "description": "string",
-      "evidence_header": "string" }
+      "evidence_header": "string",
+      "confidence": "high|medium|low" }
   ]
 }"""
 
@@ -168,6 +175,14 @@ Fill `timing_check`:
 - Headers that appear only on the cache-bust probe may be cited only inside `timing_check` — never for layers, sample states, the provider, or findings.
 - `confidence` in `timing_check` is your confidence in the timing assessment itself; `confidence_reason` explains the overall `cache_verdict.confidence` in one sentence (empty if high and uncontested).
 - Timing never adds, removes, or re-states layers and never changes `serving_layer`. Layer, sample, provider and finding citations stay header, DNS and ASN evidence. Never infer cache layers from traceroute hops.
+
+## Story fields and confidence
+
+- Always list the origin as the last layer (`role: origin`); when a cache served the page, its state is `UNKNOWN` (it was not reached). Cite the header that hints at it, or the strongest header you have for the response.
+- `headline`: one short sentence (at most 70 characters) naming the layer that served the page (or saying nothing is cached). It must not contradict `cached` or `serving_layer`.
+- `headline_detail`: one short sentence of context, at most 100 characters, e.g. what the outer layer did. Keep the full reasoning for `overall_summary`.
+- Each `confidence` rates exactly one claim: a layer's identification and state, the provider (`provider_confidence`), or a finding. Prefer `low` or `UNKNOWN` to guessing.
+- `location`: a city or PoP for a layer, only when a captured header value or hop names it; otherwise an empty string.
 
 ## Provider identity (§4.5)
 

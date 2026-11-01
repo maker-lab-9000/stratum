@@ -248,3 +248,37 @@ async def test_provider_models_unknown_provider_404(client, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     resp = await client.get("/api/models/openrouter")
     assert resp.status_code == 404
+
+
+# --- 1.3.0: cancel keeps the report ---------------------------------------------
+
+import asyncio  # noqa: E402
+
+
+async def test_cancel_running_keeps_report(repo):
+    manager = PipelineManager(repo, concurrency=2, deps=make_deps(sleep=1.0), vantage=VANTAGE)
+    app = create_app(repo, manager, serve_static=False)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        rid = (await c.post("/api/analyses", json=_body())).json()["id"]
+        await asyncio.sleep(0.05)
+        resp = await c.post(f"/api/analyses/{rid}/cancel")
+    assert resp.status_code == 200
+    assert resp.json() == {"id": rid, "status": "error"}
+    saved = repo.get(rid)
+    assert saved is not None
+    assert saved.status == "error" and saved.error == "cancelled"
+
+
+async def test_cancel_finished_is_noop(client, api_app, repo):
+    rid = (await client.post("/api/analyses", json=_body())).json()["id"]
+    await api_app.state.manager.wait(rid)
+    before = repo.get(rid).as_dict()
+    resp = await client.post(f"/api/analyses/{rid}/cancel")
+    assert resp.status_code == 200
+    assert resp.json() == {"id": rid, "status": "done"}
+    assert repo.get(rid).as_dict() == before
+
+
+async def test_cancel_unknown_404(client):
+    resp = await client.post("/api/analyses/nope/cancel")
+    assert resp.status_code == 404

@@ -94,7 +94,7 @@ test("domain + has-critical filters combine and the URL reflects them", async ()
   await waitFor(() => expect(listAnalyses).toHaveBeenCalled());
 
   await user.type(screen.getByLabelText("Filter by domain"), "shop");
-  await user.click(screen.getByLabelText("Has critical findings"));
+  await user.click(screen.getByLabelText("Only with critical findings"));
 
   await waitFor(() =>
     expect(listAnalyses).toHaveBeenLastCalledWith({ domain: "shop", hasCritical: true }),
@@ -109,7 +109,7 @@ test("a shared URL with filters deep-loads pre-filtered (survives refresh)", asy
     expect(listAnalyses).toHaveBeenCalledWith({ domain: "news", hasCritical: true }),
   );
   expect(screen.getByLabelText("Filter by domain")).toHaveValue("news");
-  expect(screen.getByLabelText("Has critical findings")).toBeChecked();
+  expect(screen.getByLabelText("Only with critical findings")).toBeChecked();
 });
 
 // --- Scenario 3: row opens the report permalink ------------------------------
@@ -160,4 +160,55 @@ test("empty under active filters offers to clear them (not the first-run copy)",
   renderHistory("/history?domain=none");
   const empty = await screen.findByTestId("history-empty");
   expect(empty).toHaveTextContent(/match these filters/i);
+});
+
+// --- 1.3.0 redesign: columns with confidence -----------------------------------
+
+const layer = (o: Record<string, unknown>) => ({
+  layer_name: "L", vendor: "", cache_type: "c", role: "edge", caches: true, state: "MISS", evidence_headers: [], ...o,
+});
+
+test("columns: served phrase, confidence meter, coloured finding counts", async () => {
+  const cached = makeReport(1, {
+    verdict_json: {
+      cached: true, confidence: "high", provider: "Amazon CloudFront", serving_layer: "Fastly shared cache",
+      layer_count_to_origin: 2, sample_states: [], provider_evidence: [],
+      layers: [
+        layer({ layer_name: "CloudFront edge", vendor: "Amazon CloudFront" }),
+        layer({ layer_name: "Fastly shared cache", vendor: "Fastly", role: "shield", state: "HIT" }),
+      ],
+      validation: { ok: true, flags: [] },
+    },
+  });
+  const degraded = makeReport(2, { verdict_json: { status: "unavailable", reason: "x" }, llm_json: null });
+  const quiet = makeReport(3, { llm_json: { security_findings: [], performance_findings: [] } });
+  vi.mocked(listAnalyses).mockResolvedValue({ reports: [cached, degraded, quiet] });
+  renderHistory();
+  const table = await screen.findByTestId("history-table");
+  const heads = Array.from(table.querySelectorAll("thead th")).map((th) => th.textContent).filter(Boolean);
+  expect(heads).toEqual(["Page", "Served from", "Confidence", "Findings", "When"]);
+
+  const rowOf = (url: string) => screen.getByRole("link", { name: url }).closest("tr") as HTMLElement;
+  const r1 = rowOf("https://site1.example.com/page");
+  expect(r1.textContent).toContain("Fastly, behind Amazon CloudFront");
+  expect(within(r1).getByRole("img", { name: "Confidence: high" })).toBeInTheDocument();
+  expect(within(r1).getByText("1 critical")).toHaveClass("crit");
+  expect(within(r1).getByText("1 warning")).toHaveClass("warn");
+
+  const r2 = rowOf("https://site2.example.com/page");
+  expect(r2.textContent).toContain("No verdict");
+  expect(within(r2).getByRole("img", { name: "Not rated" })).toBeInTheDocument();
+
+  const r3 = rowOf("https://site3.example.com/page");
+  expect(within(r3).getByText("none")).toBeInTheDocument();
+});
+
+test("running analyses read Running… and link to the live view", async () => {
+  vi.mocked(listAnalyses).mockResolvedValue({ reports: [makeReport(4, { status: "running", verdict_json: null, llm_json: null })] });
+  renderHistory();
+  const link = await screen.findByRole("link", { name: "https://site4.example.com/page" });
+  expect(link).toHaveAttribute("href", "/runs/rep-4");
+  const row = link.closest("tr") as HTMLElement;
+  expect(row.textContent).toContain("Running…");
+  expect(row.textContent).not.toContain("No verdict");
 });

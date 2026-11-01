@@ -8,6 +8,8 @@ export interface Layer {
   caches: boolean;
   state: string;
   evidence_headers: string[];
+  confidence?: string | null; // 1.3.0 per-claim confidence (absent on older reports)
+  location?: string;
 }
 
 export interface SampleState {
@@ -42,6 +44,9 @@ export interface CacheVerdict {
   sample_states: SampleState[];
   validation?: { ok: boolean; flags: ValidationFlag[] };
   confidence_reason?: string; // 1.2.0; absent on older reports
+  headline?: string; // 1.3.0
+  headline_detail?: string; // 1.3.0
+  provider_confidence?: string | null; // 1.3.0
   timing_check?: TimingCheck; // 1.2.0; absent on older reports
   status?: string; // "unavailable" when degraded
   reason?: string;
@@ -59,6 +64,7 @@ export interface Finding {
   title: string;
   description: string;
   evidence_header: string;
+  confidence?: string | null; // 1.3.0
 }
 
 export interface Hop {

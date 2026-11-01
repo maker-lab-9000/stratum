@@ -34,10 +34,7 @@ export function RawDrawer({ samples }: { samples: Sample[] }) {
 
   return (
     <details className="drawer">
-      <summary>
-        <span className="chev">▶</span> Raw response headers{" "}
-        <span className="hint">ground truth · per request</span>
-      </summary>
+      <summary>Raw response headers</summary>
       <div className="drawer-body">
         {samples.length <= TAB_LIMIT ? (
           <div className="rawtabs">

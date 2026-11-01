@@ -73,7 +73,21 @@ const LLM_JSON = {
   ],
 };
 
-export const akamaiReport: Report = {
+// 1.3.0 story fields + per-claim confidence (the model's own ratings).
+const STORY_VERDICT = {
+  ...CACHE_VERDICT,
+  headline: "Served from the Apache Dispatcher in Frankfurt.",
+  headline_detail: "Both Akamai tiers missed every request.",
+  provider_confidence: "high",
+  layers: CACHE_VERDICT.layers.map((layer, i) => ({
+    ...layer,
+    confidence: ["high", "high", "high", "low"][i],
+    location: i < 2 ? "Frankfurt" : "",
+  })),
+};
+
+/** The same report as produced before 1.3.0 (no headline / per-claim fields). */
+export const akamaiReportLegacy: Report = {
   id: "akamai-bypass-demo",
   url: "https://www.example-foods.com/en/recipes/slow-roast-hero",
   created_at: "2026-06-26T14:22:00+02:00",
@@ -100,4 +114,15 @@ export const akamaiReport: Report = {
   error: null,
   domain: "www.example-foods.com",
   has_critical: true,
+};
+
+export const akamaiReport: Report = {
+  ...akamaiReportLegacy,
+  verdict_json: { ...STORY_VERDICT, validation: { ok: true, flags: [] } },
+  llm_json: {
+    ...LLM_JSON,
+    cache_verdict: STORY_VERDICT,
+    security_findings: (LLM_JSON.security_findings as Record<string, unknown>[]).map((f) => ({ ...f, confidence: "medium" })),
+    performance_findings: (LLM_JSON.performance_findings as Record<string, unknown>[]).map((f) => ({ ...f, confidence: "high" })),
+  },
 };

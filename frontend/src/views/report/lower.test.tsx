@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,8 +8,9 @@ import { akamaiReport } from "../../fixtures/akamaiReport";
 import { Findings } from "./Findings";
 import { Progression } from "./Progression";
 import { RawDrawer } from "./RawDrawer";
-import { Section02 } from "./Section02";
-import { TopologyChain } from "./TopologyChain";
+import { MemoryRouter } from "react-router-dom";
+
+import { ReportView } from "./ReportView";
 import type { CacheVerdict, Finding, Layer } from "./types";
 
 // --- builders ---------------------------------------------------------------
@@ -45,52 +44,7 @@ function verdict(layers: Layer[], servingName: string, over: Partial<CacheVerdic
 
 // --- Scenario 1: any layer count renders; flag never collides ---------------
 
-test("2-, 5- and 7-layer chains render one node per layer (+browser), one served flag", () => {
-  const shapes = [2, 5, 7];
-  for (const count of shapes) {
-    const layers: Layer[] = Array.from({ length: count }, (_, i) =>
-      layer({
-        layer_name: `Layer ${i}`,
-        role: i === 0 ? "edge" : i === count - 1 ? "origin" : "reverse_proxy",
-        state: i === 2 ? "HIT" : "PASS",
-      }),
-    );
-    const serveIdx = Math.min(2, count - 1);
-    const v = verdict(layers, `Layer ${serveIdx}`);
-    const { container, unmount } = render(<TopologyChain verdict={v} />);
-
-    // Browser + one node per layer.
-    expect(container.querySelectorAll(".chain .node")).toHaveLength(count + 1);
-    // Exactly one "served from here" flag; anchor tags are never inferred.
-    expect(container.querySelectorAll(".flag")).toHaveLength(1);
-    expect(container.querySelectorAll(".anchor-tag")).toHaveLength(0);
-    unmount();
-  }
-});
-
 // --- Scenario 2: UNKNOWN node is dashed, distinct from dimmed not-reached ----
-
-test("UNKNOWN layer before the boundary is a dashed node, not a dimmed one", () => {
-  const layers: Layer[] = [
-    layer({ layer_name: "Edge", role: "edge", state: "PASS" }),
-    layer({ layer_name: "Shield", role: "shield", state: "UNKNOWN" }), // ambiguous, pre-boundary
-    layer({ layer_name: "Proxy", role: "reverse_proxy", state: "HIT" }), // serving
-    layer({ layer_name: "Origin", role: "origin", state: "UNKNOWN" }), // beyond boundary
-  ];
-  const { container } = render(<TopologyChain verdict={verdict(layers, "Proxy")} />);
-  const chain = within(container.querySelector(".chain") as HTMLElement);
-
-  const unknownNode = within(chain.getByText("Shield").closest(".node") as HTMLElement);
-  expect(chain.getByText("Shield").closest(".node")).toHaveClass("unknown");
-  expect(unknownNode.getByText("UNKNOWN")).toBeInTheDocument();
-
-  // The origin, though also UNKNOWN, is beyond the serving boundary -> dimmed
-  // "not reached", NOT the dashed-unknown treatment.
-  const originNode = chain.getByText("Origin").closest(".node") as HTMLElement;
-  expect(originNode).toHaveClass("dim");
-  expect(originNode).not.toHaveClass("unknown");
-  expect(within(originNode).getByText("NOT REACHED")).toBeInTheDocument();
-});
 
 // --- Scenario 3: N<=6 renders columns; N>6 renders a hover strip ------------
 
@@ -133,43 +87,35 @@ test("progression uses request columns at N=4 and a hover strip at N=10", () => 
 
 // --- Scenario 4: findings collapse past 3, severity-sorted ------------------
 
-test("9 findings -> top 3 shown severity-first, 'show all (9)' expands the rest", async () => {
+test("findings are one severity-sorted list with meters", async () => {
   const user = userEvent.setup();
-  const mk = (severity: Finding["severity"], n: number): Finding[] =>
-    Array.from({ length: n }, (_, i) => ({
-      severity,
-      title: `${severity}-${i}`,
-      description: "d",
-      evidence_header: "Age: 0",
-    }));
-  // Deliberately unsorted: 3 info, 3 warning, 3 critical.
-  const security = [...mk("info", 3), ...mk("warning", 3), ...mk("critical", 3)];
-  render(<Findings security={security} performance={[]} />);
-
-  // Only the top 3 render; the button advertises the full count.
-  expect(screen.getAllByText(/^(critical|warning|info)-\d$/)).toHaveLength(3);
-  const btn = screen.getByRole("button", { name: "show all (9)" });
-
-  // Severity-first: the three visible are the criticals.
-  expect(screen.getByText("critical-0")).toBeInTheDocument();
-  expect(screen.queryByText("info-0")).not.toBeInTheDocument();
-  // Count label reflects every finding, not just the visible ones.
-  expect(screen.getByText("· 3 critical · 3 warning · 3 info")).toBeInTheDocument();
-
-  await user.click(btn);
-  expect(screen.getAllByText(/^(critical|warning|info)-\d$/)).toHaveLength(9);
-  expect(screen.getByText("info-0")).toBeInTheDocument();
+  const security: Finding[] = [
+    { severity: "info", title: "S-info", description: "d", evidence_header: "server: x", confidence: "medium" },
+    { severity: "warning", title: "S-warn", description: "d", evidence_header: "Strict-Transport-Security" },
+  ];
+  const performance: Finding[] = [
+    { severity: "critical", title: "P-crit", description: "d", evidence_header: "Age: 0", confidence: "high" },
+    { severity: "warning", title: "P-warn", description: "d", evidence_header: "Age: 0" },
+    { severity: "info", title: "P-info1", description: "d", evidence_header: "Age: 0" },
+    { severity: "info", title: "P-info2", description: "d", evidence_header: "Age: 0" },
+  ];
+  const gap = { status: "gap" as const, summary: "S", hidden_layer_suspected: true, confidence: "medium", evidence: ["request 2 server_ms: 3.2"] };
+  const { container } = render(<Findings security={security} performance={performance} timing={gap} />);
+  const titles = () => Array.from(container.querySelectorAll(".finding-title")).map((t) => t.textContent);
+  expect(titles()).toEqual(["P-crit", "Timing doesn't match the headers", "S-warn", "P-warn", "S-info"]);
+  const row = (title: string) => (container.querySelector(`[data-title="${title}"]`) as HTMLElement);
+  expect(row("S-warn").textContent).toContain("Security");
+  expect(row("P-crit").textContent).toContain("Performance");
+  expect(within(row("P-crit")).getByRole("img", { name: "Confidence: high" })).toBeInTheDocument();
+  expect(within(row("P-warn")).getByRole("img", { name: "Not rated" })).toBeInTheDocument();
+  expect(within(row("Timing doesn't match the headers")).getByRole("img", { name: "Confidence: medium" })).toBeInTheDocument();
+  expect(within(row("P-crit")).getByText("Age: 0").tagName).toBe("CODE");
+  await user.click(screen.getByRole("button", { name: "Show all (7)" }));
+  expect(titles()).toHaveLength(7);
 });
+
 
 // --- Scenario 5: chain flips to a vertical timeline below ~700px -------------
-
-test("the chain has a mobile vertical-timeline rule (no horizontal scroll)", () => {
-  const css = readFileSync(resolve(process.cwd(), "src", "index.css"), "utf8");
-  const media = css.match(/@media\s*\(max-width:\s*700px\)\s*\{([\s\S]*?)\n\}/);
-  expect(media, "expected a max-width:700px breakpoint").not.toBeNull();
-  expect(media![1]).toMatch(/\.chain\s*\{[^}]*flex-direction:\s*column/);
-  expect(media![1]).toMatch(/\.chain\s*\{[^}]*overflow:\s*visible/);
-});
 
 // --- Scenario 6: header/evidence values are inert text (XSS) -----------------
 
@@ -188,7 +134,7 @@ test("an injection probe in a header value renders as text, never as markup", ()
     } as unknown as Report["verdict_json"],
   };
 
-  const { container } = render(<Section02 report={xssReport} />);
+  const { container } = render(<MemoryRouter><ReportView report={xssReport} /></MemoryRouter>);
 
   // No live <img> was ever created from the payload.
   expect(container.querySelector("img")).toBeNull();
@@ -225,7 +171,7 @@ test("malicious header values (script/ANSI/10KB) render as text, UI intact", () 
     } as unknown as Report["verdict_json"],
   };
 
-  const { container } = render(<Section02 report={malicious} />);
+  const { container } = render(<MemoryRouter><ReportView report={malicious} /></MemoryRouter>);
 
   // No live nodes were ever created from the payload, and nothing executed.
   expect(container.querySelector("script")).toBeNull();

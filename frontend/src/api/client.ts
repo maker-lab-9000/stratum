@@ -83,6 +83,7 @@ export async function getReport(id: string): Promise<Report> {
 export interface ListFilters {
   domain?: string | null;
   hasCritical?: boolean;
+  limit?: number;
 }
 
 /** GET /api/analyses with optional domain + has-critical filters (§7 history). */
@@ -90,6 +91,7 @@ export async function listAnalyses(filters: ListFilters = {}): Promise<{ reports
   const params = new URLSearchParams();
   if (filters.domain) params.set("domain", filters.domain);
   if (filters.hasCritical) params.set("has_critical", "true");
+  if (filters.limit) params.set("limit", String(filters.limit));
   const qs = params.toString();
   return json(await fetch(`/api/analyses${qs ? `?${qs}` : ""}`));
 }
@@ -99,6 +101,11 @@ export async function deleteAnalysis(id: string): Promise<void> {
   if (!res.ok && res.status !== 204) {
     throw new Error(`${res.status} ${res.statusText}`);
   }
+}
+
+/** POST /api/analyses/:id/cancel — stops a running analysis, keeps the report. */
+export async function cancelAnalysis(id: string): Promise<{ id: string; status: string }> {
+  return json(await fetch(`/api/analyses/${id}/cancel`, { method: "POST" }));
 }
 
 export async function rerunAnalysis(id: string): Promise<{ id: string }> {

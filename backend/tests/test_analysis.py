@@ -320,3 +320,68 @@ def test_malformed_new_fields_do_not_lose_verdict(field, value, expected):
 def test_prompt_probe_header_citation_rule():
     assert "only inside `timing_check`" in SYSTEM_PROMPT
     assert "cite the probe's headers as plain" in SYSTEM_PROMPT
+
+
+# --- 1.3.0: story fields + per-claim confidence --------------------------------
+
+def test_parse_new_story_fields():
+    data = copy.deepcopy(VALID_RESULT)
+    cv = data["cache_verdict"]
+    cv["headline"] = "Served from the Apache Dispatcher."
+    cv["headline_detail"] = "Akamai passed every request on."
+    cv["provider_confidence"] = "high"
+    cv["layers"][0]["confidence"] = "medium"
+    cv["layers"][0]["location"] = "Frankfurt"
+    data["security_findings"][0]["confidence"] = "low"
+    parsed = parse_structured_result(json.dumps(data))
+    pv = parsed.cache_verdict
+    assert pv.headline == "Served from the Apache Dispatcher."
+    assert pv.headline_detail == "Akamai passed every request on."
+    assert pv.provider_confidence == "high"
+    assert pv.layers[0].confidence == "medium" and pv.layers[0].location == "Frankfurt"
+    assert parsed.security_findings[0].confidence == "low"
+
+
+@pytest.mark.parametrize("bad", ["moderate", "very high", 5, None])
+def test_story_fields_optional_and_coerced(bad):
+    plain = parse_structured_result(json.dumps(VALID_RESULT))
+    pv = plain.cache_verdict
+    assert pv.headline == "" and pv.headline_detail == ""
+    assert pv.provider_confidence is None
+    assert pv.layers[0].confidence is None and pv.layers[0].location == ""
+    assert plain.security_findings[0].confidence is None
+
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["provider_confidence"] = bad
+    data["cache_verdict"]["layers"][0]["confidence"] = bad
+    data["performance_findings"][0]["confidence"] = bad
+    data["cache_verdict"]["headline"] = None
+    data["cache_verdict"]["layers"][0]["location"] = None
+    coerced = parse_structured_result(json.dumps(data))  # never raises
+    assert coerced.cache_verdict.provider_confidence is None
+    assert coerced.cache_verdict.layers[0].confidence is None
+    assert coerced.performance_findings[0].confidence is None
+    assert coerced.cache_verdict.headline == ""
+    assert coerced.cache_verdict.layers[0].location == ""
+
+
+def test_prompt_story_rules():
+    for marker in ("headline", "headline_detail", "provider_confidence", "location",
+                   "Always list the origin as the last layer", "at most 100 characters"):
+        assert marker in SYSTEM_PROMPT, marker
+
+
+def test_confidence_values_are_case_insensitive():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["confidence"] = "High"
+    data["cache_verdict"]["provider_confidence"] = " Medium "
+    data["cache_verdict"]["layers"][0]["confidence"] = "LOW"
+    data["cache_verdict"]["timing_check"] = {"status": "gap", "confidence": "High", "evidence": []}
+    data["performance_findings"][0]["confidence"] = "High"
+    parsed = parse_structured_result(json.dumps(data))  # must not raise / drop the verdict
+    cv = parsed.cache_verdict
+    assert cv.confidence == "high"
+    assert cv.provider_confidence == "medium"
+    assert cv.layers[0].confidence == "low"
+    assert cv.timing_check is not None and cv.timing_check.confidence == "high"
+    assert parsed.performance_findings[0].confidence == "high"

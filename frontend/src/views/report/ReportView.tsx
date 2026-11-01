@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { getReport, rerunAnalysis, type Report } from "../../api/client";
-import { Badge } from "../../components";
-import { Section01 } from "./Section01";
-import { Section02 } from "./Section02";
-import { splitSamples } from "./timing";
-import type { CacheVerdict, RawSample } from "./types";
+import { TopBar } from "../../components";
+import { Answer } from "./Answer";
+import { Claims } from "./Claims";
+import { Findings, timingCard } from "./Findings";
+import { Hosted } from "./Hosted";
+import { Progression } from "./Progression";
+import { Strata } from "./Strata";
+import { edgeRttMs, splitSamples } from "./timing";
+import type { CacheVerdict, Finding, RawSample } from "./types";
 import { isDegraded } from "./types";
-import { VerdictConfidence } from "./VerdictConfidence";
-import { VerdictTiles } from "./VerdictTiles";
 
 // The report centerpiece. Loads by id (or renders an injected report, used by the
 // /dev/report demo and tests). Section 02 + findings land in T19.
@@ -38,14 +40,14 @@ export function ReportView({ report: injected }: ReportViewProps) {
 
   if (error) {
     return (
-      <main className="wrap" style={{ paddingTop: 40 }}>
+      <main className="page">
         <div className="empty-state">Could not load this report: {error}</div>
       </main>
     );
   }
   if (!report) {
     return (
-      <main className="wrap" style={{ paddingTop: 40 }}>
+      <main className="page">
         <div className="empty-state">Loading report…</div>
       </main>
     );
@@ -60,55 +62,67 @@ export function ReportView({ report: injected }: ReportViewProps) {
       })
     : null;
 
+  const verdict = isDegraded(report.verdict_json) ? null : (report.verdict_json as unknown as CacheVerdict | null);
+  const showStory = report.status !== "error" && verdict !== null && Array.isArray(verdict.layers);
+  const samples = (report.samples_json as unknown as RawSample[] | null) ?? [];
+  const { requests, probe } = splitSamples(samples);
+  const edgeRtt = edgeRttMs(requests);
+  const security = (report.llm_json?.["security_findings"] as Finding[] | undefined) ?? [];
+  const performance = (report.llm_json?.["performance_findings"] as Finding[] | undefined) ?? [];
+
   return (
-    <>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <div className="brand">
-            <span className="dot" />
-            <Link to="/" style={{ color: "inherit", textDecoration: "none" }}>
-              Stratum
-            </Link>
-            <span className="sub">cache analysis</span>
-          </div>
-          <div className="target">
+    <main className="page">
+      <TopBar
+        context={
+          <>
             <span className="url" title={report.url}>
               {report.url}
             </span>
-          </div>
-          <div className="meta-pills">
-            {report.model && (
-              <Badge variant="pill" keep>
-                Model <b>{report.model}</b>
-              </Badge>
-            )}
-            {report.samples_json && (
-              <Badge variant="pill">
-                {splitSamples(report.samples_json as unknown as RawSample[]).requests.length} requests
-              </Badge>
-            )}
-            {createdLabel && <Badge variant="pill">{createdLabel}</Badge>}
-          </div>
-          <button type="button" className="btn" onClick={onRerun}>
+            {report.model && <span>read by {report.model}</span>}
+            {createdLabel && <span>{createdLabel}</span>}
+          </>
+        }
+        actions={
+          <button type="button" className="btn-quiet" onClick={onRerun}>
             Re-run
           </button>
-        </div>
-      </header>
+        }
+      />
 
-      <main className="wrap">
-        <VerdictConfidence
-          verdict={isDegraded(report.verdict_json) ? null : (report.verdict_json as unknown as CacheVerdict | null)}
-        />
-        <VerdictTiles report={report} onRerun={onRerun} />
-        <Section01 report={report} />
-        <Section02 report={report} />
+      <Answer report={report} onRerun={onRerun} />
+      {showStory && verdict && (
+        <>
+          <Strata verdict={verdict} vantage={report.vantage} />
+          <Claims verdict={verdict} />
+        </>
+      )}
 
-        <p className="footnote">
-          Measurements (DNS, headers, traceroute) are ground-truth facts. The verdict is
-          interpreted from them by the LLM, with every claim's evidence citation machine-checked
-          against the captured data.
-        </p>
-      </main>
-    </>
+      {requests.length > 0 && (
+        <section>
+          <h2>What the requests showed</h2>
+          <p className="lede">
+            Measured values from {requests.length} consecutive requests
+            {probe ? ", plus one with a random query string to force a miss." : "."}
+            {verdict ? " The first row is the model's reading." : ""}
+          </p>
+          <Progression verdict={verdict} samples={samples} />
+          {edgeRtt != null && <p className="note">One round trip to the edge took {edgeRtt} ms.</p>}
+        </section>
+      )}
+
+      {verdict && (security.length > 0 || performance.length > 0 || timingCard(verdict.timing_check)) && (
+        <section>
+          <h2>What to look at</h2>
+          <Findings security={security} performance={performance} timing={verdict.timing_check} />
+        </section>
+      )}
+
+      <Hosted report={report} />
+
+      <p className="note footnote">
+        Measurements (DNS, headers, timing, traceroute) are facts. The verdict is the model's reading
+        of them, and every claim's cited evidence is checked against the captured data.
+      </p>
+    </main>
   );
 }

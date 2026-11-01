@@ -84,3 +84,21 @@ def test_fake_emits_timing_check():
     assert isinstance(verdict["cache_verdict"]["confidence_reason"], str)
     result = validate_verdict(StructuredResult.model_validate(verdict), bundle)
     assert result.ok, result.flags
+
+
+def test_fake_emits_story_fields():
+    import json as _json
+    from pathlib import Path as _Path
+
+    from app.llm.fake import _verdict_from_bundle
+    from app.llm.schema import StructuredResult
+    from app.pipeline.validator import validate_verdict
+
+    bundle = _json.loads((_Path(__file__).parent / "fixtures/bundle/golden_bundle.json").read_text())
+    verdict = _verdict_from_bundle(bundle)
+    cv = verdict["cache_verdict"]
+    assert cv["headline"]
+    assert all(layer.get("confidence") for layer in cv["layers"])
+    assert cv["layers"][-1]["role"] == "origin"
+    result = validate_verdict(StructuredResult.model_validate(verdict), bundle)
+    assert result.ok, result.flags

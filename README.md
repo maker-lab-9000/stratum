@@ -15,46 +15,41 @@ requirements spec for the full contract.
 
 ## Start here
 
-Point it at a URL, pick a provider + model (fetched live from the provider),
-and optionally tune the request count, interval, cache warm-up, geo hint, and
-custom request headers.
+Paste a URL and press **Analyze**. The model that reads the evidence is one
+quiet line underneath (models are fetched live from the provider); request
+count, interval, warm-up, the cache-bust probe, geo hint and custom headers sit
+under **More options**. Recent analyses, with the model's confidence, are one
+click away.
 
-![Launch form](docs/screenshots/launch.png)
+![Launch](docs/screenshots/launch.png)
 
 ## The report
 
-A single report, top to bottom (real analysis of `https://www.berlin.de/` —
-served from an *unidentified* shared cache with no CDN vendor headers, so the
-verdict is honestly hedged at low confidence rather than guessed).
+The report tells one story, top to bottom.
 
-**Verdict + network route** — the headline verdict tiles (cached, CDN cache,
-serving layer, hosting), DNS resolution, and the computed route geography
-plotting the transit PoPs.
+**The answer and the layers** — the verdict in plain words with the model's
+confidence as a signal meter, then the request's path drawn as stacked layers
+from you to the origin: each layer's role, the header that proves its state,
+and the model's confidence in that layer. The layer that served the page is
+marked; layers after it are "not reached". Who delivered the page and whether
+the timing agrees sit underneath, each with its own meter.
 
-![Verdict tiles, DNS and route geography](docs/screenshots/report-01-verdict-route.png)
+![The answer and the cache layers](docs/screenshots/report-01-answer-strata.png)
 
-**Hop ladder** — the enriched TCP-traceroute hops (IP, rDNS, ASN/org, city, RTT
-bars), with private runs dimmed, timeouts as `* * *`, and same-ASN runs
-collapsed into one expandable row.
+**What the requests showed + what to look at** — the measured values across the
+N requests (Age, Cache-Control, Via, time to first byte, time behind the edge,
+plus the cache-bust probe), with the model's per-request reading as the one
+interpreted row; then security and performance findings as a single
+severity-sorted list, each with its cited evidence and confidence.
 
-![Enriched traceroute hop ladder](docs/screenshots/report-02-hop-ladder.png)
+![Measured values and findings](docs/screenshots/report-02-measured-findings.png)
 
-**Segment narration + serving layer** — the three route segments (access →
-transit → origin) up to the measurement seam, then the serving-layer topology
-chain with the serving node flagged and everything past the boundary dimmed.
+**Where it's hosted** — the vantage, DNS, the server that answered and the route
+summary; the map, hop list, route narration and raw response headers are folded
+underneath. Every claim is the model's, and every cited piece of evidence is
+machine-checked against the captured data.
 
-![Segment narration, measurement seam and serving-layer topology](docs/screenshots/report-03-segments-topology.png)
-
-**Layer breakdown + header progression** — the per-layer table and how the cache
-signals evolve across the N samples.
-
-![Layer-by-layer breakdown and header progression](docs/screenshots/report-04-layers-progression.png)
-
-**Findings** — severity-sorted security and performance findings, each with its
-cited evidence header, plus the raw-headers drawer. Every claim is the LLM's,
-cited from response headers the backend machine-checked.
-
-![Security and performance findings](docs/screenshots/report-05-findings.png)
+![Where it's hosted, with the map and hop list open](docs/screenshots/report-03-hosted.png)
 
 ## Stack
 

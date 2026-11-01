@@ -200,6 +200,7 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
         failed = [c for c in layer.evidence_headers if not index.contains(c)]
         if failed or not layer.evidence_headers:
             layer.state = "UNKNOWN"
+            layer.confidence = "low"
             downgraded_layers.add(layer.layer_name)
             if not layer.evidence_headers:
                 flags.append(ValidationFlag(f"cache_verdict.layers[{i}].state", "", _NO_EVIDENCE))
@@ -220,6 +221,7 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
     provider_failed = [c for c in cv.provider_evidence if not index.contains(c)]
     if provider_failed or not cv.provider_evidence:
         cv.provider = "UNKNOWN"
+        cv.provider_confidence = "low"
         if not cv.provider_evidence:
             flags.append(ValidationFlag("cache_verdict.provider", "", _NO_EVIDENCE))
         for citation in provider_failed:
@@ -250,6 +252,7 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
         for i, finding in enumerate(findings):
             header = finding.evidence_header
             if ":" in header and not index.contains(header):
+                finding.confidence = "low"
                 flags.append(ValidationFlag(f"{section}[{i}].evidence_header", header, reason_for(header)))
 
     return ValidationResult(verdict=verdict, flags=flags)

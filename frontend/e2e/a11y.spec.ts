@@ -28,13 +28,13 @@ test("Live run has no serious/critical a11y violations", async ({ page }) => {
   await mockApi(page, { streamFrames: RUNNING_FRAMES });
   await page.goto("/runs/rep-e2e");
   await expect(page.getByTestId("stepper")).toBeVisible();
-  await expect(page.getByTestId("live-headers")).toBeVisible();
+  await expect(page.getByText("Show raw headers")).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);
 });
 
 test("Report (fixture) has no serious/critical a11y violations", async ({ page }) => {
   await page.goto("/dev/report");
-  await expect(page.getByTestId("chain")).toBeVisible();
+  await expect(page.locator(".strata")).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);
 });
 
@@ -42,5 +42,13 @@ test("History has no serious/critical a11y violations", async ({ page }) => {
   await mockApi(page, { reports: historyRows(6) });
   await page.goto("/history");
   await expect(page.getByTestId("history-table")).toBeVisible();
+  expect(await seriousViolations(page)).toEqual([]);
+});
+
+test("Report at 390 with every disclosure open has no serious/critical a11y violations", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/dev/report");
+  await expect(page.locator(".strata")).toBeVisible();
+  for (const summary of await page.locator("details > summary").all()) await summary.click();
   expect(await seriousViolations(page)).toEqual([]);
 });

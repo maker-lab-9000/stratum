@@ -53,14 +53,14 @@ const probeHead: ReactNode = (
   </>
 );
 
-export function Progression({ verdict, samples }: { verdict: CacheVerdict; samples: RawSample[] }) {
+export function Progression({ verdict, samples }: { verdict: CacheVerdict | null; samples: RawSample[] }) {
   const { requests, probe } = splitSamples(samples);
   const n = requests.length;
   if (n === 0) return null;
   const compact = n > COLUMN_LIMIT;
   const probeColumn = !compact && probe !== null;
   const firstStart = requests[0]?.started_at_ms ?? null;
-  const states: SampleState[] = verdict.sample_states ?? [];
+  const states: SampleState[] = verdict?.sample_states ?? [];
   const stateFor = (request: number) => states.find((s) => s.request === request)?.state ?? "UNKNOWN";
 
   // Verbatim signal rows: label + per-request value. Uniform values collapse to
@@ -97,9 +97,10 @@ export function Progression({ verdict, samples }: { verdict: CacheVerdict; sampl
   return (
     <>
       <Table variant="prog" head={head}>
-        {/* Per-request cache state — the LLM's interpretation of each sample. */}
-        <TableRow state={verdict.cached ? "served" : undefined}>
-          <th scope="row">Cache state</th>
+        {/* The model's per-request reading — the only interpreted row (1.3.0: labelled as such). */}
+        {verdict && (
+        <TableRow>
+          <th scope="row">Model's reading</th>
           {compact ? (
             <td>
               <span className="strip">
@@ -123,6 +124,7 @@ export function Progression({ verdict, samples }: { verdict: CacheVerdict; sampl
           )}
           {probeCell(null)}
         </TableRow>
+        )}
 
         {signals.map(({ label, header, muted }) => {
           const values = requests.map((s) => headerValue(s, header));

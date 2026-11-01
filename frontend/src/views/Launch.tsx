@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   createAnalysis,
   getModels,
   getProviderModels,
+  listAnalyses,
   type CreateAnalysisBody,
   type ModelInfo,
   type ProviderInfo,
+  type Report,
 } from "../api/client";
+import { ConfidenceMeter, TopBar } from "../components";
+import { isInProgress, servedPhrase } from "./report/story";
+import type { CacheVerdict } from "./report/types";
+import { isDegraded } from "./report/types";
 
 // Above this many models, the picker gets a filter box (OpenRouter lists ~300).
 const MODEL_FILTER_THRESHOLD = 15;
@@ -50,6 +56,13 @@ export function Launch() {
   const [cacheBust, setCacheBust] = useState(true);
   const [geoHint, setGeoHint] = useState("");
   const [headers, setHeaders] = useState<HeaderRow[]>([{ name: "", value: "" }]);
+  const [recent, setRecent] = useState<Report[]>([]);
+
+  useEffect(() => {
+    listAnalyses({ limit: 5 })
+      .then((data) => setRecent(data.reports ?? []))
+      .catch(() => setRecent([]));
+  }, []);
 
   useEffect(() => {
     getModels()
@@ -159,24 +172,21 @@ export function Launch() {
   }
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "72px 24px 80px" }}>
-      <div className="brand" style={{ justifyContent: "center", fontSize: 22, marginBottom: 8 }}>
-        <span className="dot" />
-        Stratum
-        <span className="sub">cache &amp; delivery analyzer</span>
-      </div>
-      <p style={{ textAlign: "center", color: "var(--mid)", marginTop: 0, marginBottom: 32 }}>
-        Give it a URL. It collects the evidence; the model reads it.
+    <main className="page launch">
+      <TopBar />
+      <h1>Which layer serves this page?</h1>
+      <p className="lede">
+        Stratum requests the page a few times, traces the route, and a model reads the evidence.
       </p>
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="field">
-          <label className="field-label" htmlFor="url">
-            Target URL
+        <div className="url-row">
+          <label className="sr-only" htmlFor="url">
+            Page URL
           </label>
           <input
             id="url"
-            className={urlError ? "input invalid" : "input"}
+            className={urlError ? "url-input invalid" : "url-input"}
             type="text"
             inputMode="url"
             placeholder="https://www.example.com/page"
@@ -188,178 +198,152 @@ export function Launch() {
               if (urlError) setUrlError(null);
             }}
           />
-          {urlError && (
-            <span id="url-error" className="field-error" role="alert">
-              {urlError}
-            </span>
-          )}
+          <button type="submit" className="btn-primary" disabled={noProviders || submitting}>
+            {submitting ? "Starting…" : "Analyze"}
+          </button>
         </div>
+        {urlError && (
+          <span id="url-error" className="field-error" role="alert">
+            {urlError}
+          </span>
+        )}
+        {submitError && (
+          <span className="field-error" role="alert">
+            {submitError}
+          </span>
+        )}
 
         {noProviders ? (
-          <div className="empty-state" style={{ marginTop: 16 }}>
+          <p className="note launch-empty">
             No LLM providers configured. Set <code>ANTHROPIC_API_KEY</code> or{" "}
             <code>OPENROUTER_API_KEY</code> in the environment and reload.
-          </div>
+          </p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 16 }}>
-            <div className="field">
-              <label className="field-label" htmlFor="provider">
-                Provider
-              </label>
-              <select
-                id="provider"
-                className="select"
-                value={provider}
-                onChange={(e) => onProviderChange(e.target.value)}
-              >
-                {(providers ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="model">
-                Model{" "}
-                {modelsLoading ? (
-                  <span className="field-hint" role="status">
-                    · loading…
-                  </span>
-                ) : (
-                  <span className="field-hint">· {providerModels.length} available</span>
-                )}
-              </label>
-              {showModelFilter && (
-                <input
-                  className="input"
-                  type="search"
-                  placeholder="filter models…"
-                  aria-label="Filter models"
-                  value={modelFilter}
-                  onChange={(e) => setModelFilter(e.target.value)}
-                  style={{ marginBottom: 8 }}
-                />
-              )}
-              <select
-                id="model"
-                className="select"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                disabled={modelsLoading && providerModels.length === 0}
-              >
-                {renderedModels.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="model-row">
+            <span>Read by</span>
+            <label className="sr-only" htmlFor="provider">
+              Provider
+            </label>
+            <select id="provider" className="quiet-select" value={provider} onChange={(e) => onProviderChange(e.target.value)}>
+              {(providers ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <label className="sr-only" htmlFor="model">
+              Model
+            </label>
+            {showModelFilter && (
+              <input
+                className="quiet-input"
+                type="search"
+                placeholder="filter models…"
+                aria-label="Filter models"
+                value={modelFilter}
+                onChange={(e) => setModelFilter(e.target.value)}
+              />
+            )}
+            <select
+              id="model"
+              className="quiet-select"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={modelsLoading && providerModels.length === 0}
+            >
+              {renderedModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+            <span className="note" role="status">
+              {modelsLoading ? "loading models…" : `${providerModels.length} available`}
+            </span>
           </div>
         )}
 
-        <details className="disclosure" style={{ marginTop: 18 }}>
-          <summary>
-            <span className="chev">▸</span> Advanced
-          </summary>
-          <div style={{ display: "grid", gap: 14, paddingTop: 8 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div className="field">
-                <label className="field-label" htmlFor="request-count">
-                  Requests
-                </label>
-                <input
-                  id="request-count"
-                  className="input"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={requestCount}
-                  onChange={(e) => setRequestCount(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="interval">
-                  Interval (ms)
-                </label>
-                <input
-                  id="interval"
-                  className="input"
-                  type="number"
-                  min={0}
-                  max={60000}
-                  value={intervalMs}
-                  onChange={(e) => setIntervalMs(e.target.value)}
-                />
-              </div>
+        <details className="more-options">
+          <summary>More options</summary>
+          <div className="options-grid">
+            <div className="field">
+              <label className="field-label" htmlFor="request-count">
+                Requests
+              </label>
+              <input id="request-count" className="quiet-input" type="number" min={1} max={20} value={requestCount} onChange={(e) => setRequestCount(e.target.value)} />
             </div>
-            <label className="check">
-              <input type="checkbox" checked={warm} onChange={(e) => setWarm(e.target.checked)} />
-              Warm the cache (browser navigation) before sampling
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={cacheBust} onChange={(e) => setCacheBust(e.target.checked)} />
-              Cache-bust probe (forced miss)
-            </label>
+            <div className="field">
+              <label className="field-label" htmlFor="interval">
+                Interval (ms)
+              </label>
+              <input id="interval" className="quiet-input" type="number" min={0} max={60000} value={intervalMs} onChange={(e) => setIntervalMs(e.target.value)} />
+            </div>
             <div className="field">
               <label className="field-label" htmlFor="geo-hint">
                 Geo hint
               </label>
-              <input
-                id="geo-hint"
-                className="input"
-                type="text"
-                placeholder="optional, e.g. fra"
-                value={geoHint}
-                onChange={(e) => setGeoHint(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <span className="field-label">Custom request headers</span>
-              {headers.map((row, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8 }}>
-                  <input
-                    className="input"
-                    aria-label={`header ${i + 1} name`}
-                    placeholder="Header-Name"
-                    value={row.name}
-                    onChange={(e) => updateHeader(i, { name: e.target.value })}
-                  />
-                  <input
-                    className="input"
-                    aria-label={`header ${i + 1} value`}
-                    placeholder="value"
-                    value={row.value}
-                    onChange={(e) => updateHeader(i, { value: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className="pill"
-                    aria-label={`add header row`}
-                    onClick={() => setHeaders((r) => [...r, { name: "", value: "" }])}
-                  >
-                    +
-                  </button>
-                </div>
-              ))}
+              <input id="geo-hint" className="quiet-input" type="text" placeholder="optional, e.g. fra" value={geoHint} onChange={(e) => setGeoHint(e.target.value)} />
             </div>
           </div>
+          <label className="check">
+            <input type="checkbox" checked={warm} onChange={(e) => setWarm(e.target.checked)} />
+            Warm the cache (browser navigation) before sampling
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={cacheBust} onChange={(e) => setCacheBust(e.target.checked)} />
+            Cache-bust probe (forced miss)
+          </label>
+          <div className="field">
+            <span className="field-label">Custom request headers</span>
+            {headers.map((row, i) => (
+              <div key={i} className="header-row">
+                <input className="quiet-input" aria-label={`header ${i + 1} name`} placeholder="Header-Name" value={row.name} onChange={(e) => updateHeader(i, { name: e.target.value })} />
+                <input className="quiet-input" aria-label={`header ${i + 1} value`} placeholder="value" value={row.value} onChange={(e) => updateHeader(i, { value: e.target.value })} />
+                <button type="button" className="btn-quiet" aria-label="add header row" onClick={() => setHeaders((r) => [...r, { name: "", value: "" }])}>
+                  +
+                </button>
+              </div>
+            ))}
+          </div>
         </details>
-
-        <button
-          type="submit"
-          className="btn"
-          disabled={noProviders || submitting}
-          style={{ width: "100%", marginTop: 22, padding: "12px 16px" }}
-        >
-          {submitting ? "Starting…" : "Run analysis"}
-        </button>
-        {submitError && (
-          <span className="field-error" role="alert" style={{ display: "block", marginTop: 8 }}>
-            {submitError}
-          </span>
-        )}
       </form>
+
+      {recent.length > 0 && (
+        <section className="recent">
+          <h2>Recent</h2>
+          {recent.map((r) => {
+            const running = isInProgress(r.status);
+            const degraded = isDegraded(r.verdict_json) || r.status === "error";
+            const verdict = degraded || running ? null : (r.verdict_json as unknown as CacheVerdict | null);
+            return (
+              <div key={r.id} className="recent-row">
+                <span className={`vdot ${verdictDot(r)}`} aria-hidden="true" />
+                <Link className="url" to={running ? `/runs/${r.id}` : `/reports/${r.id}`}>
+                  {r.url}
+                </Link>
+                <span className="what">{running ? "Running…" : servedPhrase(verdict, degraded)}</span>
+                <ConfidenceMeter level={verdict ? verdict.confidence : null} />
+                <span className="when">{shortWhen(r.created_at)}</span>
+              </div>
+            );
+          })}
+        </section>
+      )}
     </main>
   );
+}
+
+function verdictDot(r: Report): "hit" | "miss" | "unknown" {
+  const v = r.verdict_json as unknown as CacheVerdict | null;
+  if (!v || isDegraded(r.verdict_json) || r.status === "error") return "unknown";
+  return v.cached ? "hit" : "miss";
+}
+
+function shortWhen(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return sameDay
+    ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

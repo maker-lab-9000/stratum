@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stratum — strata report (mockup v4)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1419;--panel:#151d25;--raise:#202c36;--line:#26323d;--soft:#1c2630;
+    --hi:#e9eff4;--mid:#9aabb8;--lo:#6e8496;
+    --accent:#5b9df0;--hit:#54d98c;--miss:#f0b34a;
+    --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    --disp:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;
+    --body:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--hi);font:15px/1.6 var(--body)}
+  .wrap{max-width:1000px;margin:0 auto;padding:26px 32px 96px}
+  .mono{font-family:var(--mono);font-size:12.5px;color:var(--mid)}
+
+  .top{display:flex;align-items:baseline;gap:18px;font-size:13px;color:var(--lo)}
+  .top .brand{font:600 15px var(--disp);color:var(--hi)}
+  .top .url{font-family:var(--mono);color:var(--mid)}
+  .top .when{margin-left:auto}
+  .top button{background:none;border:1px solid var(--line);color:var(--hi);border-radius:8px;padding:5px 12px;font:inherit;cursor:pointer}
+  .top button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* the answer + the one loud thing: confidence */
+  .answer{display:grid;grid-template-columns:1fr auto;gap:40px;align-items:end;padding:56px 0 30px}
+  .answer h1{font:500 40px/1.15 var(--disp);letter-spacing:-.015em;margin:0;max-width:20ch}
+  .answer h1 span{display:block;color:var(--mid);font-weight:400}
+  .gauge{text-align:right;min-width:190px}
+  .gauge .bars{justify-content:flex-end}
+  .gauge .word{display:block;font:600 22px var(--disp);margin-top:10px}
+  .gauge .sub{display:block;font-size:12.5px;color:var(--lo)}
+  .bars{display:inline-flex;align-items:flex-end;gap:5px}
+  .bars i{display:block;width:13px;border-radius:2px;background:var(--raise)}
+  .bars i:nth-child(1){height:16px}.bars i:nth-child(2){height:28px}.bars i:nth-child(3){height:40px}
+  .bars.l1 i:nth-child(-n+1),.bars.l2 i:nth-child(-n+2),.bars.l3 i:nth-child(-n+3){background:var(--accent)}
+  .bars.sm{gap:2px}.bars.sm i{width:5px}
+  .bars.sm i:nth-child(1){height:6px}.bars.sm i:nth-child(2){height:9px}.bars.sm i:nth-child(3){height:12px}
+  .why{color:var(--mid);max-width:68ch;margin:0}
+
+  /* the strata: the page's spine */
+  .strata{margin-top:44px;position:relative}
+  .surface{display:flex;align-items:center;gap:10px;padding:0 0 10px 0;color:var(--lo);font-size:13px}
+  .surface::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid var(--mid)}
+  .band{display:grid;grid-template-columns:28px 190px 1fr 108px;align-items:center;gap:16px;
+        min-height:86px;padding:14px 18px 14px 0;border-top:1px solid var(--line);background:var(--panel)}
+  .band:last-of-type{border-bottom:1px solid var(--line)}
+  .drop{align-self:stretch;position:relative}
+  .drop::before{content:"";position:absolute;left:13px;top:-15px;bottom:-15px;width:2px;background:var(--mid)}
+  .band.served .drop::after{content:"";position:absolute;left:7px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:var(--hit);box-shadow:0 0 0 4px rgba(84,217,140,.18)}
+  .band.served .drop::before{bottom:50%}
+  .who .name{font:500 17px var(--disp)}
+  .who .role{font-size:13px;color:var(--lo)}
+  .proof .state{font-weight:600;font-size:14px}
+  .proof .state.hit{color:var(--hit)}
+  .proof .mono{display:block;margin-top:2px}
+  .rate{display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:13px;color:var(--mid)}
+  .band.served{box-shadow:inset 3px 0 0 var(--hit)}
+  .band.unreached{background:repeating-linear-gradient(135deg,transparent 0 7px,rgba(154,171,184,.05) 7px 8px),var(--bg);color:var(--lo)}
+  .band.unreached .who .name{color:var(--mid)}
+  .band.unreached .drop::before{display:none}
+  .served-note{font-size:12.5px;color:var(--hit);margin-left:8px;font-weight:500}
+
+  .claims{margin-top:18px;display:grid;gap:8px}
+  .claim{display:grid;grid-template-columns:140px 1fr 108px;gap:16px;align-items:baseline;font-size:14px}
+  .claim .k{color:var(--lo);font-size:13px}
+  .claim .v{color:var(--hi)}
+  .claim .v small{color:var(--mid);font-size:13px}
+
+  section{margin-top:64px}
+  h2{font:500 19px var(--disp);margin:0 0 4px}
+  .lede{color:var(--mid);margin:0 0 18px;max-width:66ch;font-size:14px}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:right;font-weight:500;color:var(--lo);font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left;padding-left:0}
+  td{padding:9px 10px;border-bottom:1px solid var(--soft);text-align:right;font-family:var(--mono);font-size:12.5px;color:var(--mid);font-variant-numeric:tabular-nums}
+  td:first-child{font-family:var(--body);font-size:13.5px;color:var(--hi)}
+  .probe{color:var(--lo)}
+  .note{font-size:12.5px;color:var(--lo);margin-top:10px}
+
+  .finding{display:grid;grid-template-columns:76px 1fr 108px;gap:16px;padding:16px 0;border-top:1px solid var(--soft)}
+  .finding:last-child{border-bottom:1px solid var(--soft)}
+  .sev{font-size:13px;font-weight:600}.sev.warn{color:var(--miss)}.sev.info{color:var(--lo)}
+  .finding h3{margin:0;font:500 15.5px var(--disp)}
+  .finding p{margin:3px 0 6px;color:var(--mid);font-size:14px;max-width:62ch}
+
+  .route{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  .route .k{font-size:13px;color:var(--lo)}
+  details{border-top:1px solid var(--soft);margin-top:20px}
+  details + details{margin-top:0}
+  summary{cursor:pointer;padding:13px 0;color:var(--mid);font-size:14px}
+  summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  @media (max-width:720px){
+    .wrap{padding:20px 18px 72px}
+    .top{flex-wrap:wrap;row-gap:4px}
+    .top .url{order:3;width:100%}
+    .top .when{order:4;width:100%;margin-left:0}
+    .top button{margin-left:auto}
+    .answer{grid-template-columns:1fr;gap:20px;padding-top:36px}
+    .answer h1{font-size:30px}
+    .gauge{text-align:left}.gauge .bars{justify-content:flex-start}
+    .band{grid-template-columns:24px 1fr;grid-template-areas:"d w" "d p" "d r";min-height:0;gap:6px 12px}
+    .drop{grid-area:d}.who{grid-area:w}.proof{grid-area:p}.rate{grid-area:r;justify-content:flex-start}
+    .claim,.finding{grid-template-columns:1fr}
+    .route{grid-template-columns:1fr}
+    table{display:block;overflow-x:auto}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="brand">Stratum</span>
+    <span class="url">https://www.persil.de/</span>
+    <span class="when">Oct 31, 14:38, read by claude-opus-4-8</span>
+    <button type="button">Re-run</button>
+  </header>
+
+  <div class="answer">
+    <h1>Served from Fastly's cache in Frankfurt.<span>CloudFront, in front of it, missed every request.</span></h1>
+    <div class="gauge" role="img" aria-label="Verdict confidence: high">
+      <span class="bars l3" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="word">High confidence</span>
+      <span class="sub">in the verdict as a whole</span>
+    </div>
+  </div>
+  <p class="why">CloudFront reports a miss on all four requests, yet <span class="mono">Age</span> climbs from 613 to 617 seconds and Fastly's <span class="mono">x-served-by</span> header leaks through. A cache behind CloudFront stored the page and served it. The timing agrees.</p>
+
+  <!-- The strata: one spine for the whole story -->
+  <div class="strata" aria-label="Cache layers from you to the origin">
+    <div class="surface">You, in Berlin</div>
+
+    <div class="band">
+      <div class="drop"></div>
+      <div class="who"><div class="name">CloudFront</div><div class="role">Edge cache, Berlin</div></div>
+      <div class="proof"><span class="state">Miss, passed the request on</span><span class="mono">x-cache: Miss from cloudfront</span></div>
+      <div class="rate"><span class="bars sm l3" aria-hidden="true"><i></i><i></i><i></i></span>High</div>
+    </div>
+
+    <div class="band served">
+      <div class="drop"></div>
+      <div class="who"><div class="name">Fastly</div><div class="role">Shield cache, Frankfurt</div></div>
+      <div class="proof"><span class="state hit">Hit<span class="served-note">served the page</span></span><span class="mono">age: 613</span><span class="mono">x-served-by: cache-fra-etou8220180-FRA</span></div>
+      <div class="rate"><span class="bars sm l3" aria-hidden="true"><i></i><i></i><i></i></span>High</div>
+    </div>
+
+    <div class="band unreached">
+      <div class="drop"></div>
+      <div class="who"><div class="name">AEM</div><div class="role">Origin</div></div>
+      <div class="proof"><span class="state">Not reached</span><span class="mono">dispatcher-age: (empty)</span></div>
+      <div class="rate"><span class="bars sm l1" aria-hidden="true"><i></i><i></i><i></i></span>Low</div>
+    </div>
+  </div>
+
+  <div class="claims">
+    <div class="claim"><span class="k">Delivered by</span><span class="v">Amazon CloudFront <small>from the CNAME and the Via header</small></span><span class="rate"><span class="bars sm l3"><i></i><i></i><i></i></span>High</span></div>
+    <div class="claim"><span class="k">Timing</span><span class="v">Agrees with the headers <small>29 to 50 ms behind the edge, against 63.8 ms for a forced miss</small></span><span class="rate"><span class="bars sm l2"><i></i><i></i><i></i></span>Medium</span></div>
+  </div>
+
+  <section>
+    <h2>What the requests showed</h2>
+    <p class="lede">Measured, not interpreted. Four requests 1.5 seconds apart, then one with a random query string to force a miss.</p>
+    <table>
+      <thead><tr><th>Request</th><th>1</th><th>2</th><th>3</th><th>4</th><th class="probe">Forced miss</th></tr></thead>
+      <tbody>
+        <tr><td>Age</td><td>613</td><td>614</td><td>616</td><td>617</td><td class="probe">0</td></tr>
+        <tr><td>CloudFront</td><td>Miss</td><td>Miss</td><td>Miss</td><td>Miss</td><td class="probe">Miss</td></tr>
+        <tr><td>Time to first byte</td><td>51.6 ms</td><td>50.2 ms</td><td>42.2 ms</td><td>63.4 ms</td><td class="probe">76.7 ms</td></tr>
+        <tr><td>Time behind the edge</td><td>38.7 ms</td><td>37.3 ms</td><td>29.3 ms</td><td>50.5 ms</td><td class="probe">63.8 ms</td></tr>
+      </tbody>
+    </table>
+    <p class="note">One round trip to the edge took 12.9 ms.</p>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <div class="finding">
+      <span class="sev warn">Warning</span>
+      <div><h3>CloudFront isn't caching the page</h3><p>Every request misses at the edge and travels on to Fastly, adding a Berlin to Frankfurt round trip each time.</p><span class="mono">x-cache: Miss from cloudfront</span></div>
+      <span class="rate"><span class="bars sm l3"><i></i><i></i><i></i></span>High</span>
+    </div>
+    <div class="finding">
+      <span class="sev info">Info</span>
+      <div><h3>No Content-Security-Policy header</h3><p>The page doesn't restrict where scripts can load from.</p><span class="mono">Content-Security-Policy</span></div>
+      <span class="rate"><span class="bars sm l2"><i></i><i></i><i></i></span>Medium</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where it's hosted</h2>
+    <p class="lede">The network path from this machine to the first server that answered. A trace stops there, so it never shows the cache layers above.</p>
+    <div class="route">
+      <div><div class="k">DNS</div><div class="mono">www.persil.de<br>d3fcbz57t4izbt.cloudfront.net</div></div>
+      <div><div class="k">Answered by</div><div class="mono">18.64.119.98</div></div>
+      <div><div class="k">Route</div><div>Not traced <span class="note">needs raw-socket permission</span></div></div>
+    </div>
+    <details><summary>Map and hop list</summary><p class="note">The existing geomap, hop ladder and network notes, folded by default.</p></details>
+    <details><summary>Raw response headers</summary><p class="note">The existing per-request headers.</p></details>
+  </section>
+
+</div>
+</body>
+</html>

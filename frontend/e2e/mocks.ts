@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { akamaiReport } from "../src/fixtures/akamaiReport";
+
 // Single API stub for the e2e run — no backend. Branches on method + path so
 // route-precedence never bites. Every view gets exactly the shape it reads.
 export interface ApiOpts {
@@ -40,6 +42,9 @@ export async function mockApi(page: Page, opts: ApiOpts = {}): Promise<void> {
     if (path === "/api/analyses") return route.fulfill({ json: { reports: opts.reports ?? [] } });
     if (/^\/api\/analyses\/[^/]+$/.test(path) && method === "GET") {
       return route.fulfill({ json: opts.report ?? {} });
+    }
+    if (path.endsWith("/cancel") && method === "POST") {
+      return route.fulfill({ json: { id: path.split("/")[3], status: "error" } });
     }
     if (method === "DELETE") return route.fulfill({ status: 204, body: "" });
     return route.fulfill({ status: 404, json: { detail: "not found" } });
@@ -83,3 +88,53 @@ export function historyRows(n: number): object[] {
     has_critical: true,
   }));
 }
+
+// A report with very long values (layer names, header values, URL) and ten
+// requests — the phone-width layout must wrap it, never scroll sideways.
+export function longReport(): object {
+  const long = (prefix: string) => `${prefix}-${"x".repeat(120)}`;
+  const base = akamaiReport as unknown as { verdict_json: Record<string, unknown>; samples_json: Record<string, unknown>[] };
+  const verdict = base.verdict_json as { layers: Record<string, unknown>[] };
+  const layers = verdict.layers.map((l) => ({
+    ...l,
+    layer_name: long("layer"),
+    vendor: long("vendor"),
+    evidence_headers: [`x-long-header: ${long("value")}`],
+  }));
+  const sample0 = base.samples_json[0];
+  const token = `x-amz-cf-id: ${"Q2xvdWRGcm9udA".repeat(8)}==`;
+  const llm = (akamaiReport as unknown as { llm_json: Record<string, unknown> }).llm_json;
+  const perf = (llm.performance_findings as Record<string, unknown>[]).map((f) => ({ ...f, description: `${f.description} ${token}` }));
+  return {
+    ...akamaiReport,
+    id: "long",
+    llm_json: { ...llm, overall_summary: `${llm.overall_summary} ${token}`, performance_findings: perf },
+    url: `https://www.example-foods.com/${"deep/".repeat(30)}page`,
+    verdict_json: {
+      ...verdict,
+      layers,
+      serving_layer: layers[2].layer_name,
+      confidence_reason: `Lowered because ${token}`,
+      timing_check: { status: "consistent", summary: `Timing agrees ${token}`, hidden_layer_suspected: false, confidence: "medium", evidence: [] },
+    },
+    samples_json: Array.from({ length: 10 }, (_, i) => ({
+      ...sample0,
+      request: i + 1,
+      headers: [["x-long-header", long("value")], ["age", String(i)]],
+    })),
+  };
+}
+
+// ~300 models with one very long name — the launch line must not scroll at 390.
+export const LONG_MODELS = {
+  providers: [
+    {
+      id: "openrouter",
+      name: "OpenRouter",
+      models: [
+        { id: "google/gemini-2.5-flash-image-preview", name: "Google: Gemini 2.5 Flash Image Preview (Nano Banana) — extended preview build" },
+        ...Array.from({ length: 300 }, (_, i) => ({ id: `m/${i}`, name: `Model ${i}` })),
+      ],
+    },
+  ],
+};
