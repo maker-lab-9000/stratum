@@ -170,12 +170,12 @@ def _timed_bundle() -> dict:
     return bundle
 
 
-def _with_timing(evidence, status="gap", reason="timing disagrees"):
+def _with_timing(evidence, status="gap", reason="timing disagrees", **extra):
     data = copy.deepcopy(VALID_RESULT)
     data["cache_verdict"]["confidence_reason"] = reason
     data["cache_verdict"]["timing_check"] = {
         "status": status, "summary": "s", "hidden_layer_suspected": True,
-        "confidence": "medium", "evidence": evidence,
+        "confidence": "medium", "evidence": evidence, **extra,
     }
     return StructuredResult.model_validate(data)
 
@@ -326,3 +326,23 @@ def test_non_origin_layer_still_cannot_cite_probe_headers():
     result = validate_verdict(StructuredResult.model_validate(data), _timed_bundle())
     flag = next(f for f in result.flags if f.path == "cache_verdict.layers[0].state")
     assert flag.reason == "cited header appears only on the cache-bust probe"
+
+
+# --- 1.3.2: header-diff facts are exact; a discarded check forgets the probe call --
+
+def test_header_diff_fact_must_match_exactly():
+    bundle = _timed_bundle()
+    bundle["timing"]["facts"].append("cache_bust differing headers: none")
+    ok = validate_verdict(_with_timing(["edge_rtt_ms: 38.2", "cache_bust differing headers: none"]), bundle)
+    assert ok.verdict.cache_verdict.timing_check.status == "gap"
+    forged = validate_verdict(
+        _with_timing(["edge_rtt_ms: 38.2", "cache_bust differing headers: x-probe-only"]), bundle)
+    assert forged.verdict.cache_verdict.timing_check.status == "insufficient"
+
+
+def test_discarded_timing_check_clears_probe_reached_origin():
+    kept = validate_verdict(_with_timing(["edge_rtt_ms: 38.2"], probe_reached_origin=True), _timed_bundle())
+    assert kept.verdict.cache_verdict.timing_check.probe_reached_origin is True
+    dropped = validate_verdict(_with_timing(["request 2 server_ms: 412.5"], probe_reached_origin=True),
+                               _timed_bundle())
+    assert dropped.verdict.cache_verdict.timing_check.probe_reached_origin is None

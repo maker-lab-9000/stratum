@@ -360,17 +360,37 @@ test("bands that share a vendor are named by layer, without repeating the cache 
   expect(bands[2].querySelector(".band-detail")!.textContent).toBe("Apache Dispatcher, disk cache");
 });
 
+const REACHED: TimingCheck = { ...GAP, status: "consistent", hidden_layer_suspected: false, probe_reached_origin: true };
+
 test("the origin band shows the cache-bust request's time behind the edge", () => {
   const probe = { ...timedSample(4, true), timing: { connect_ms: null, tls_ms: null, ttfb_ms: 288.2, total_ms: 300, rtt_ms: null } };
-  const { container, unmount } = renderReport(withSamples([timedSample(1), timedSample(2), timedSample(3), probe]));
+  const samples = [timedSample(1), timedSample(2), timedSample(3), probe];
+  const { container, unmount } = renderReport({ ...withVerdict({ timing_check: REACHED }), samples_json: samples } as unknown as Report);
   const bands = Array.from(container.querySelectorAll(".band")) as HTMLElement[];
   const origin = bands[bands.length - 1];
   expect(origin.querySelector(".band-measured")!.textContent).toBe("Cache-bust request: 250 ms behind the edge");
   expect(container.querySelectorAll(".band-measured")).toHaveLength(1);
   unmount();
 
-  const none = renderReport(withSamples([timedSample(1), timedSample(2)]));
+  const none = renderReport({ ...withVerdict({ timing_check: REACHED }), samples_json: [timedSample(1), timedSample(2)] } as unknown as Report);
   expect(none.container.querySelector(".band-measured")).toBeNull();
+});
+
+test("the cache-bust line appears only when the model says the probe reached the origin (1.3.2)", () => {
+  const probe = { ...timedSample(4, true), timing: { connect_ms: null, tls_ms: null, ttfb_ms: 61.6, total_ms: 70, rtt_ms: null } };
+  const samples = [timedSample(1), timedSample(2), timedSample(3), probe];
+  const measured = (timing_check: TimingCheck | undefined) => {
+    const { container, unmount } = renderReport({ ...withVerdict({ timing_check }), samples_json: samples } as unknown as Report);
+    const found = container.querySelector(".band-measured") !== null;
+    unmount();
+    return found;
+  };
+  expect(measured(REACHED)).toBe(true);
+  // theguardian.com: the cache ignored the query string, so it never got there.
+  expect(measured({ ...REACHED, probe_reached_origin: false })).toBe(false);
+  expect(measured({ ...REACHED, probe_reached_origin: undefined })).toBe(false);
+  expect(measured({ ...REACHED, status: "insufficient" })).toBe(false);
+  expect(measured(undefined)).toBe(false);
 });
 
 test("hosted route prefers the header location when GeoIP disagrees", () => {
@@ -404,4 +424,48 @@ test("hosted route says 1 hop", () => {
   const { container } = renderReport(one);
   const route = within(container.querySelector(".hosted") as HTMLElement).getByText("Route").parentElement as HTMLElement;
   expect(route.textContent).toContain("1 hop,");
+});
+
+// --- The model's reading: a long summary reads as points, a short one as prose --
+
+test("a summary of three or more sentences renders as one point per sentence", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] = "Akamai fronts the page. Its hit/miss headers are stripped. Server time is around 130-170 ms. The edge is a passthrough.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  const items = Array.from(container.querySelectorAll("ul.why li")).map((li) => li.textContent);
+  expect(items).toEqual([
+    "Akamai fronts the page.",
+    "Its hit/miss headers are stripped.",
+    "Server time is around 130-170 ms.",
+    "The edge is a passthrough.",
+  ]);
+  expect(container.querySelector("p.why")).toBeNull();
+});
+
+test("a summary of one or two sentences stays a paragraph", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] = "Akamai fronts the page. Its hit/miss headers are stripped.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  expect(container.querySelector("p.why")?.textContent).toBe("Akamai fronts the page. Its hit/miss headers are stripped.");
+  expect(container.querySelector("ul.why")).toBeNull();
+});
+
+test("the reasoning has a heading and its confidence sentence, last, is bold", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] =
+    "DNS points to Akamai. The edge strips its hit headers. The origin generated every response. Confidence is medium because Akamai's cache headers are hidden.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  const section = container.querySelector("section.reasoning") as HTMLElement;
+  expect(within(section).getByRole("heading", { level: 2, name: "Reasoning" })).toBeInTheDocument();
+  const items = Array.from(section.querySelectorAll("ul.why li"));
+  expect(items).toHaveLength(4);
+  expect(items[3].querySelector("strong")?.textContent).toBe("Confidence is medium because Akamai's cache headers are hidden.");
+  expect(items.slice(0, 3).some((li) => li.querySelector("strong"))).toBe(false);
+});
+
+test("a last sentence that is not about confidence stays regular weight", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] = "DNS points to Akamai. The edge strips its hit headers. The origin generated every response.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  expect(container.querySelector("ul.why strong")).toBeNull();
 });

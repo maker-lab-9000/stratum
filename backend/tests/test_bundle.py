@@ -236,7 +236,8 @@ def test_timing_section_arithmetic():
         {"request": 3, "ttfb_ms": 42.0, "server_ms": 3.8},
     ]
     assert timing["server_ms_spread"] == {"min": 3.2, "median": 3.5, "max": 3.8, "count": 2}
-    assert timing["cache_bust"] == {"ttfb_ms": 450.7, "server_ms": 412.5, "status": 200}
+    assert timing["cache_bust"] == {"ttfb_ms": 450.7, "server_ms": 412.5, "status": 200,
+                                   "differing_headers": []}
     assert timing["facts"] == [
         "edge_rtt_ms: 38.2",
         "request 1 ttfb_ms: 79.5", "request 1 server_ms: 41.3",
@@ -244,6 +245,7 @@ def test_timing_section_arithmetic():
         "request 3 ttfb_ms: 42.0", "request 3 server_ms: 3.8",
         "warm server_ms min: 3.2", "warm server_ms median: 3.5", "warm server_ms max: 3.8",
         "cache_bust ttfb_ms: 450.7", "cache_bust server_ms: 412.5", "cache_bust status: 200",
+        "cache_bust differing headers: none", "warm-varying headers: none",
     ]
 
 
@@ -319,3 +321,49 @@ def test_edge_rtt_ignores_connect_span_with_dns():
     assert no_rtt["edge_rtt_ms"] is None
     assert all(r["server_ms"] is None for r in no_rtt["requests"])
 
+
+
+# --- 1.3.2: does the cache-bust response differ from the warm ones? -----------
+
+def _headed(sample: dict, headers: list[list[str]]) -> dict:
+    sample["headers"] = headers
+    return sample
+
+
+def test_identical_cache_bust_reports_no_differing_headers():
+    # theguardian.com shape: only per-request values change, the probe included.
+    base = [["Cache-Control", "max-age=60, private"], ["Age", "0"], ["ETag", 'W/"h1"']]
+    def row(n, timer, rid, date):
+        return base + [["x-timer", timer], ["x-request-id", rid], ["Date", date]]
+    samples = [
+        _headed(_timed(1, ttfb=35.5, rtt=21.4), row(1, "S1,VS0,VE9", "a", "d1")),
+        _headed(_timed(2, ttfb=26.1), row(2, "S2,VS0,VE1", "b", "d1")),
+        _headed(_timed(3, ttfb=29.7), row(3, "S3,VS0,VE2", "c", "d1")),
+        _headed(_timed(4, ttfb=44.6, probe=True), row(4, "S4,VS0,VE2", "d", "d2")),
+    ]
+    timing = timing_section(samples)
+    assert "cache_bust differing headers: none" in timing["facts"]
+    assert "warm-varying headers: x-request-id, x-timer" in timing["facts"]
+    assert timing["cache_bust"]["differing_headers"] == []
+    assert timing["warm_varying_headers"] == ["x-request-id", "x-timer"]
+
+
+def test_cache_bust_differences_compare_against_warm_requests_only():
+    # Request 1 is the cold miss: the probe is compared with requests 2..N.
+    def warm(n, cache):
+        return _headed(_timed(n, ttfb=30.0, rtt=20.0 if n == 1 else None),
+                       [["X-Cache", cache], ["Cache-Control", "max-age=300"]])
+    probe = _headed(_timed(4, ttfb=290.0, probe=True),
+                    [["x-cache", "BYPASS"], ["cache-control", "no-store"], ["set-cookie", "a=1"]])
+    timing = timing_section([warm(1, "MISS"), warm(2, "HIT"), warm(3, "HIT"), probe])
+    assert "cache_bust differing headers: cache-control, set-cookie, x-cache" in timing["facts"]
+    assert "warm-varying headers: none" in timing["facts"]
+
+
+def test_no_header_diff_without_a_usable_probe():
+    requests = [_timed(1, ttfb=30.0, rtt=20.0), _timed(2, ttfb=31.0)]
+    assert not any("differing headers" in f for f in timing_section(requests)["facts"])
+    failed = _timed(3, ttfb=None, probe=True)
+    failed.update({"ok": False, "headers": []})
+    facts = timing_section(requests + [failed])["facts"]
+    assert not any("differing headers" in f or "warm-varying" in f for f in facts)

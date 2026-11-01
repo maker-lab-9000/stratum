@@ -114,3 +114,30 @@ export function roleLabel(role: string): string {
 export function isInProgress(status: string | null | undefined): boolean {
   return status === "queued" || status === "running";
 }
+
+// Split prose into sentences for the "model's reading" points (1.3.3). Pure
+// text handling, no reading of meaning: a sentence ends at . ! or ? followed by
+// whitespace and a capital letter, a digit or an opening quote/bracket. A period
+// that closes an abbreviation (B.V., i.e., e.g., vs., approx.) or sits inside a
+// hostname (www.example.de) never ends a sentence.
+const ABBREVIATIONS = new Set(["e.g", "i.e", "vs", "approx", "etc", "cf", "no", "ca", "resp"]);
+
+export function sentences(text: string): string[] {
+  const out: string[] = [];
+  let start = 0;
+  const re = /[.!?]+(?=\s+[A-Z0-9"'(\[])/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const end = m.index + m[0].length;
+    const before = text.slice(start, m.index);
+    const lastWord = before.split(/\s+/).pop() ?? "";
+    // "B.V" / "U.S" style initials, or a listed abbreviation: keep going.
+    if (m[0] === "." && (/^(?:[A-Za-z]\.)+[A-Za-z]$/.test(lastWord) || ABBREVIATIONS.has(lastWord.toLowerCase()))) continue;
+    const s = text.slice(start, end).trim();
+    if (s) out.push(s);
+    start = end;
+  }
+  const tail = text.slice(start).trim();
+  if (tail) out.push(tail);
+  return out;
+}

@@ -127,7 +127,8 @@ export function longReport(): object {
 
 // 1.3.1: four requests where one changing header carries a long unbroken value
 // on request 1 only (a real hackaday.com shape) — it must not squeeze the other
-// request columns.
+// request columns. 1.3.3: the value is ~1 KB (a kleinanzeigen.de set-cookie
+// shape) — the row must clamp instead of growing thousands of pixels tall.
 export function changingHeaderReport(): object {
   const base = akamaiReport as unknown as { samples_json: Record<string, unknown>[] };
   const sample0 = base.samples_json[0];
@@ -140,7 +141,7 @@ export function changingHeaderReport(): object {
       timing: { connect_ms: null, tls_ms: null, ttfb_ms: 270.2 + request, total_ms: 300, rtt_ms: request === 1 ? 25.5 : null },
       headers: [
         ["x-cache", request === 1 ? "MISS" : "HIT"],
-        ...(request === 1 ? [["set-cookie", `test_cookie=${"WP%20Cookie%20check".repeat(3)}; path=/`]] : []),
+        ...(request === 1 ? [["set-cookie", `_abck=${"4E163B7FF129ADF23E19699ECB3B2B78~-1~YAAQTUHHF8xlOYShAQAAeQkTmRA7GNq".repeat(16)}; Path=/; Secure`]] : []),
       ],
     })),
   };

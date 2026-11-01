@@ -9,7 +9,8 @@ import { flagsFor } from "./types";
 // the origin. Band kinds come from classifyLayers — the model's own verdict —
 // never from re-reading headers. Replaces the topology chain + layer table.
 // 1.3.1: bands sharing a vendor are named by layer; the origin band carries one
-// measured line — the cache-bust request's time behind the edge (a sample fact).
+// measured line — the cache-bust request's time behind the edge (a sample fact),
+// shown only when the model says that request reached the origin (1.3.2).
 const KIND_CLASS: Record<LayerKind, string> = {
   served: "served",
   "served-origin": "served-origin",
@@ -33,7 +34,11 @@ export function Strata({
   const last = bands[bands.length - 1];
   const originMissing = !last || last.layer.role !== "origin";
   const { requests, probe } = splitSamples(samples);
-  const probeBehindEdge = probe ? serverMs(probe, edgeRttMs(requests)) : null;
+  // 1.3.2: only when the model says the probe really got past the caches — a
+  // cache that ignores the query string answers it from the edge.
+  const timing = verdict.timing_check;
+  const probeReachedOrigin = timing?.probe_reached_origin === true && timing.status !== "insufficient";
+  const probeBehindEdge = probe && probeReachedOrigin ? serverMs(probe, edgeRttMs(requests)) : null;
 
   return (
     <div className="strata" aria-label="Cache layers from you to the origin">

@@ -31,6 +31,7 @@ export interface TimingCheck {
   hidden_layer_suspected: boolean;
   confidence: string;
   evidence: string[];
+  probe_reached_origin?: boolean | null; // 1.3.2: the model's call on the cache-bust probe
 }
 
 export interface CacheVerdict {

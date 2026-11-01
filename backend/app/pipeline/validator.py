@@ -52,7 +52,8 @@ _AS_TOKEN = re.compile(r"\bas(\d+)\b", re.IGNORECASE)
 # A citation shaped like one of the bundle's timing facts must match one exactly:
 # any "<field>_ms: <number>" (wherever it appears), or the fact labels themselves.
 _FACT_SHAPE = re.compile(
-    r"\b\w+_ms\s*:\s*-?\d|^edge_rtt_ms|^warm server_ms|^cache_bust (ttfb_ms|server_ms|status)",
+    r"\b\w+_ms\s*:\s*-?\d|^edge_rtt_ms|^warm server_ms|^cache_bust (ttfb_ms|server_ms|status)"
+    r"|^cache_bust differing headers|^warm-varying headers",
     re.IGNORECASE,
 )
 
@@ -293,6 +294,7 @@ def _validate_timing(cv, bundle: dict, flags: list[ValidationFlag]) -> None:
     cv.timing_check.summary = DISCARDED_SUMMARY
     cv.timing_check.confidence = "low"
     cv.timing_check.evidence = []
+    cv.timing_check.probe_reached_origin = None
     cv.confidence_reason = (cv.confidence_reason or "") + NOTE_TIMING
     if not cited_fact:
         flags.append(ValidationFlag(path, "", _NO_TIMING_FACT))

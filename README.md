@@ -32,37 +32,44 @@ the run and keeps the report.
 
 ## The report
 
-A real analysis of `https://hackaday.com/` (WordPress VIP), top to bottom.
+A real analysis of `https://www.kleinanzeigen.de/` (Akamai in front of an
+origin gateway), top to bottom.
 
-**The answer and the layers** — the verdict in plain words with the model's
-confidence as a signal meter, then the request's path drawn as stacked layers
-from you to the origin: each layer's role, the headers that prove its state,
-the model's own name for it, and its confidence in that layer. The layer that
-served the page is marked; the origin behind it was "not reached".
+**The answer and the reasoning** — the verdict in plain words with the model's
+confidence as a signal meter and the one reason behind it, then the reasoning
+as points, ordered the way the request travels: DNS, the route and the edge,
+each cache layer, the origin, and last the confidence sentence in bold. Here
+Akamai fronts the site but strips its hit/miss headers, and every response
+carries a fresh gateway request id, so the origin generated each page.
 
-![The answer and the cache layers](docs/screenshots/report-01-answer-strata.png)
+![The answer and the reasoning](docs/screenshots/report-01-answer-reasoning.png)
 
-**What the requests showed** — the model's count of caching layers, who
-delivered the page and whether the timing agrees (each with its own meter),
-then the measured values across the requests: Age, Cache-Control and Via (or
-one "Not sent" line), a row for every header whose value changed between
-requests (a cache status flipping MISS → HIT, a rotating server id), time to
-first byte and time behind the edge, with the cache-bust probe as its own
+**The layers and what the requests showed** — the request's path drawn as
+stacked layers from you to the origin: each layer's role, the headers that
+prove its state, the model's own name for it, and its confidence in that layer.
+An edge whose state is hidden reads UNKNOWN in a dashed band; the layer that
+served the page is marked. Under it, the model's count of caching layers, who
+delivered the page and whether the timing agrees (each with its own meter), then
+the measured values across the requests: a row for every header whose value
+changed between requests (a long `set-cookie` is clamped to a few lines), time
+to first byte and time behind the edge, with the cache-bust probe as its own
 column. The model's per-request reading is the one interpreted row.
 
-![Delivery, timing and measured values](docs/screenshots/report-02-measured.png)
+![The cache layers, delivery, timing and measured values](docs/screenshots/report-02-layers-measured.png)
 
 **What to look at** — security and performance findings as one
 severity-sorted list, each with its cited evidence and the model's confidence.
 
 ![Findings](docs/screenshots/report-03-findings.png)
 
-**Where it's hosted** — the vantage, DNS, the server that answered and the
-route summary, with the DNS panel, route map, hop list, route narration and raw
-response headers folded underneath. Every claim is the model's, and every cited
-piece of evidence is machine-checked against the captured data.
+**Where it's hosted** — the vantage, DNS (here the CNAME chain into Akamai),
+the server that answered and the route summary. When the trace reaches a
+sibling edge rather than the one that answered, the report says so. The DNS
+panel, route map, hop list, route narration and raw response headers are folded
+underneath. Every claim is the model's, and every cited piece of evidence is
+machine-checked against the captured data.
 
-![Where it's hosted, with the map and hop list open](docs/screenshots/report-04-hosted.png)
+![Where it's hosted](docs/screenshots/report-04-hosted.png)
 
 ## Stack
 

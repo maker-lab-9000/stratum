@@ -382,6 +382,14 @@ def test_prompt_story_rules():
         assert marker in SYSTEM_PROMPT, marker
 
 
+def test_prompt_summary_order_rule():
+    # 1.3.3: the reasoning reads from the user's request down to the origin and
+    # ends with the confidence sentence.
+    for marker in ("`overall_summary`", "from the request outward", "DNS", "the origin last",
+                   "last sentence states the confidence"):
+        assert marker in SYSTEM_PROMPT, marker
+
+
 def test_confidence_values_are_case_insensitive():
     data = copy.deepcopy(VALID_RESULT)
     data["cache_verdict"]["confidence"] = "High"
@@ -396,3 +404,37 @@ def test_confidence_values_are_case_insensitive():
     assert cv.layers[0].confidence == "low"
     assert cv.timing_check is not None and cv.timing_check.confidence == "high"
     assert parsed.performance_findings[0].confidence == "high"
+
+
+# --- 1.3.2: hidden cache state ---------------------------------------------------
+
+def test_probe_reached_origin_is_coerced_never_fatal():
+    cases = ((True, True), (False, False), ("true", True), ("False", False), (None, None),
+             ("maybe", None), (3, None))
+    for raw, expected in cases:
+        data = copy.deepcopy(VALID_RESULT)
+        data["cache_verdict"]["timing_check"] = {
+            "status": "consistent", "summary": "s", "hidden_layer_suspected": False,
+            "confidence": "high", "evidence": [], "probe_reached_origin": raw,
+        }
+        tc = StructuredResult.model_validate(data).cache_verdict.timing_check
+        assert tc.probe_reached_origin is expected, raw
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["timing_check"] = {"status": "consistent"}
+    assert StructuredResult.model_validate(data).cache_verdict.timing_check.probe_reached_origin is None
+
+
+def test_prompt_hidden_cache_guidance():
+    for marker in (
+        "milliseconds the edge spent",       # x-timer VE for a Fastly edge in front
+        "Fastly-Debug: 1",                   # debug request header ...
+        "fastly-debug-ttl",                  # ... and how to read its answer
+        "Surrogate-Control",                 # edge TTL kept while Age is reset
+        "is not evidence of a miss",         # stripped hit token + Age 0
+        "cache_bust differing headers",      # an identical probe proves no miss
+        "probe_reached_origin",
+        "Custom request headers",            # suggest a debug re-run as a finding
+    ):
+        assert marker in SYSTEM_PROMPT, marker
+    # The forced origin default is gone.
+    assert "then `serving_layer` names the origin layer" not in SYSTEM_PROMPT

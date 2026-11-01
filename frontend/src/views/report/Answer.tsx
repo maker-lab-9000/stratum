@@ -1,6 +1,6 @@
 import type { Report } from "../../api/client";
 import { Badge, ConfidenceMeter } from "../../components";
-import { confidenceLevel, headlineFor } from "./story";
+import { confidenceLevel, headlineFor, sentences } from "./story";
 import type { CacheVerdict } from "./types";
 import { isDegraded } from "./types";
 
@@ -8,6 +8,34 @@ import { isDegraded } from "./types";
 // the page's one loud element, and the "why" paragraph (1.3.0 redesign).
 const VALIDATOR_NOTE = "citation check:";
 const stripPeriod = (s: string) => s.replace(/[.\s]+$/, "");
+
+// Reasoning (1.3.3): the model's overall_summary, ordered by the prompt from
+// the request outward to the origin, ending with the confidence sentence. One
+// or two sentences read as a paragraph; three or more as one point per
+// sentence, and a last point about confidence is set bold. The words are the
+// model's, verbatim.
+const POINTS_FROM = 3;
+const CONFIDENCE_LINE = /\bconfidence\b/i;
+function Summary({ text }: { text: string }) {
+  const parts = sentences(text);
+  const body =
+    parts.length < POINTS_FROM ? (
+      <p className="why">{text}</p>
+    ) : (
+      <ul className="why">
+        {parts.map((s, i) => {
+          const last = i === parts.length - 1;
+          return <li key={i}>{last && CONFIDENCE_LINE.test(s) ? <strong>{s}</strong> : s}</li>;
+        })}
+      </ul>
+    );
+  return (
+    <section className="reasoning">
+      <h2>Reasoning</h2>
+      {body}
+    </section>
+  );
+}
 
 function Rerun({ onRerun }: { onRerun?: () => void }) {
   return (
@@ -69,7 +97,7 @@ export function Answer({ report, onRerun }: { report: Report; onRerun?: () => vo
           )}
         </div>
       </div>
-      {summary && <p className="why">{summary}</p>}
+      {summary && <Summary text={summary} />}
     </>
   );
 }

@@ -100,6 +100,11 @@ table.prog td { font-family: var(--mono); font-size: 12px; color: var(--hi); }
 table.prog { table-layout: fixed; }
 table.prog thead th:first-child { width: 170px; }
 table.prog td { overflow-wrap: anywhere; }
+/* A long value (a multi-cookie set-cookie) is clamped to four lines so one
+   header can't make its row thousands of pixels tall; the full value is on
+   hover and in the raw drawer. Row labels stay at the top of a tall row. */
+table.prog tbody th, table.prog td { vertical-align: top; }
+table.prog .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
 
 /* header progression at N>6: per-signal state strip */
 .strip { display: inline-flex; gap: 2px; vertical-align: middle; }
@@ -315,6 +320,12 @@ pre.raw .hk { color: var(--accent); } pre.raw .hv { color: var(--hi); }
 .gauge-word { font: 600 22px var(--disp); color: var(--hi); }
 .gauge-reason { font-size: 12.5px; color: var(--mid); max-width: 30ch; }
 .why { color: var(--mid); max-width: 68ch; margin: 0; }
+ul.why { list-style: disc; padding: 0 0 0 1.1em; display: grid; gap: 6px; }
+ul.why li::marker { color: var(--lo); }
+ul.why strong { color: var(--hi); font-weight: 600; }
+/* The reasoning sits right under the answer, not a full section apart. */
+.page section.reasoning { margin-top: 0; }
+.reasoning h2 { margin-bottom: 10px; }
 
 /* --- Report: the strata (request path, you -> origin) --- */
 .strata { margin-top: 44px; }

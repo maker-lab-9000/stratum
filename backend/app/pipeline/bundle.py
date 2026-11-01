@@ -95,6 +95,37 @@ def _ttfb(sample: dict) -> float | None:
     return value if isinstance(value, (int, float)) else None
 
 
+def _header_values(sample: dict) -> dict[str, str]:
+    """Lower-cased header name → verbatim value (repeats joined with ", ")."""
+    out: dict[str, list[str]] = {}
+    for pair in sample.get("headers") or []:
+        if isinstance(pair, (list, tuple)) and len(pair) == 2:
+            out.setdefault(str(pair[0]).lower(), []).append(str(pair[1]))
+    return {k: ", ".join(v) for k, v in out.items()}
+
+
+def cache_bust_header_diff(requests: list[dict], probe: dict) -> tuple[list[str], list[str]]:
+    """(1.3.2) Which headers the cache-bust response changed, by value only.
+
+    Compared against the warm requests (2..N; request 1 is often the cold
+    miss). Headers whose value already varies between warm requests are
+    per-request noise — returned separately, never counted as a difference.
+    ``Date`` is skipped (the clock). Returns (differing, warm_varying), sorted."""
+    warm = requests[1:] if len(requests) >= 2 else requests
+    warm_values = [_header_values(s) for s in warm]
+    probe_values = _header_values(probe)
+    names = {n for v in warm_values for n in v} | set(probe_values)
+    names.discard("date")
+    varying, differing = [], []
+    for name in sorted(names):
+        seen = {v.get(name) for v in warm_values}
+        if len(seen) > 1:
+            varying.append(name)
+        elif probe_values.get(name) not in seen:
+            differing.append(name)
+    return differing, varying
+
+
 def timing_section(samples: list[dict]) -> dict:
     """Edge round trip, per-request server time and its spread, the cache-bust
     probe baseline, and the exact fact strings the LLM may cite. Numbers only —
@@ -150,6 +181,13 @@ def timing_section(samples: list[dict]) -> dict:
             facts.append(f"cache_bust server_ms: {cache_bust['server_ms']}")
         if cache_bust["status"] is not None:
             facts.append(f"cache_bust status: {cache_bust['status']}")
+        # 1.3.2: a probe that looks like the warm responses proves no miss.
+        if requests and probe.get("ok", True) and probe.get("headers"):
+            differing, varying = cache_bust_header_diff(requests, probe)
+            cache_bust["differing_headers"] = differing
+            section["warm_varying_headers"] = varying
+            facts.append(f"cache_bust differing headers: {', '.join(differing) or 'none'}")
+            facts.append(f"warm-varying headers: {', '.join(varying) or 'none'}")
     section["cache_bust"] = cache_bust
     section["facts"] = facts
     return section
