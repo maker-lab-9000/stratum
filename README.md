@@ -23,33 +23,44 @@ click away.
 
 ![Launch](docs/screenshots/launch.png)
 
+While it runs, each step fills in with what it measured: DNS, the browser
+warm-up, the sampled requests, the forced miss, the route, and finally the
+model reading the evidence. Raw headers are one click away; **Cancel** stops
+the run and keeps the report.
+
+![Live run](docs/screenshots/live-run.png)
+
 ## The report
 
-The report tells one story, top to bottom.
+A real analysis of `https://hackaday.com/` (WordPress VIP), top to bottom.
 
 **The answer and the layers** — the verdict in plain words with the model's
 confidence as a signal meter, then the request's path drawn as stacked layers
-from you to the origin: each layer's role, the header that proves its state,
-and the model's confidence in that layer. The layer that served the page is
-marked; layers after it are "not reached". Who delivered the page and whether
-the timing agrees sit underneath, each with its own meter.
+from you to the origin: each layer's role, the headers that prove its state,
+the model's own name for it, and its confidence in that layer. The layer that
+served the page is marked; the origin behind it was "not reached".
 
 ![The answer and the cache layers](docs/screenshots/report-01-answer-strata.png)
 
-**What the requests showed + what to look at** — the measured values across the
-N requests (Age, Cache-Control, Via, time to first byte, time behind the edge,
-plus the cache-bust probe), with the model's per-request reading as the one
-interpreted row; then security and performance findings as a single
-severity-sorted list, each with its cited evidence and confidence.
+**What the requests showed** — the model's count of caching layers, who
+delivered the page and whether the timing agrees (each with its own meter),
+then the measured values across the requests: Age, Cache-Control, Via, time to
+first byte and time behind the edge, with the cache-bust probe as its own
+column. The model's per-request reading is the one interpreted row.
 
-![Measured values and findings](docs/screenshots/report-02-measured-findings.png)
+![Delivery, timing and measured values](docs/screenshots/report-02-measured.png)
 
-**Where it's hosted** — the vantage, DNS, the server that answered and the route
-summary; the map, hop list, route narration and raw response headers are folded
-underneath. Every claim is the model's, and every cited piece of evidence is
-machine-checked against the captured data.
+**What to look at** — security and performance findings as one
+severity-sorted list, each with its cited evidence and the model's confidence.
 
-![Where it's hosted, with the map and hop list open](docs/screenshots/report-03-hosted.png)
+![Findings](docs/screenshots/report-03-findings.png)
+
+**Where it's hosted** — the vantage, DNS, the server that answered and the
+route summary, with the DNS panel, route map, hop list, route narration and raw
+response headers folded underneath. Every claim is the model's, and every cited
+piece of evidence is machine-checked against the captured data.
+
+![Where it's hosted, with the map and hop list open](docs/screenshots/report-04-hosted.png)
 
 ## Stack
 
