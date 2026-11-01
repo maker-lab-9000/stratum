@@ -34,6 +34,7 @@ import httpx
 DEFAULT_REQUEST_COUNT = 4
 DEFAULT_TIMEOUT_MS = 10_000
 PROBE_MARKER = "cache_bust"
+INVESTIGATION_MARKER = "investigation"  # 1.4.0: a request the model asked for
 PROBE_PARAM = "stratum-cb"
 RTT_ATTEMPTS = 3
 RTT_TIMEOUT_S = 3.0
@@ -41,7 +42,12 @@ RTT_TIMEOUT_S = 3.0
 
 def is_probe(sample: dict) -> bool:
     """True for the cache-bust probe entry (not one of the N requests)."""
-    return isinstance(sample, dict) and bool(sample.get("probe"))
+    return isinstance(sample, dict) and sample.get("probe") == PROBE_MARKER
+
+
+def is_investigation(sample: dict) -> bool:
+    """True for a request the model asked for in investigate mode (1.4.0)."""
+    return isinstance(sample, dict) and sample.get("probe") == INVESTIGATION_MARKER
 
 
 def cache_bust_url(url: str) -> str:

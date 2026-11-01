@@ -216,6 +216,7 @@
     "edge_rtt_ms": null,
     "requests": [],
     "cache_bust": null,
+    "investigation": [],
     "facts": []
   },
   "traceroute": {
