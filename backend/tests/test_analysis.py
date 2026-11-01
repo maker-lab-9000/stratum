@@ -382,6 +382,14 @@ def test_prompt_story_rules():
         assert marker in SYSTEM_PROMPT, marker
 
 
+def test_prompt_summary_order_rule():
+    # 1.3.3: the reasoning reads from the user's request down to the origin and
+    # ends with the confidence sentence.
+    for marker in ("`overall_summary`", "from the request outward", "DNS", "the origin last",
+                   "last sentence states the confidence"):
+        assert marker in SYSTEM_PROMPT, marker
+
+
 def test_confidence_values_are_case_insensitive():
     data = copy.deepcopy(VALID_RESULT)
     data["cache_verdict"]["confidence"] = "High"

@@ -322,6 +322,10 @@ pre.raw .hk { color: var(--accent); } pre.raw .hv { color: var(--hi); }
 .why { color: var(--mid); max-width: 68ch; margin: 0; }
 ul.why { list-style: disc; padding: 0 0 0 1.1em; display: grid; gap: 6px; }
 ul.why li::marker { color: var(--lo); }
+ul.why strong { color: var(--hi); font-weight: 600; }
+/* The reasoning sits right under the answer, not a full section apart. */
+.page section.reasoning { margin-top: 0; }
+.reasoning h2 { margin-bottom: 10px; }
 
 /* --- Report: the strata (request path, you -> origin) --- */
 .strata { margin-top: 44px; }

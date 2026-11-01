@@ -449,3 +449,23 @@ test("a summary of one or two sentences stays a paragraph", () => {
   expect(container.querySelector("p.why")?.textContent).toBe("Akamai fronts the page. Its hit/miss headers are stripped.");
   expect(container.querySelector("ul.why")).toBeNull();
 });
+
+test("the reasoning has a heading and its confidence sentence, last, is bold", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] =
+    "DNS points to Akamai. The edge strips its hit headers. The origin generated every response. Confidence is medium because Akamai's cache headers are hidden.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  const section = container.querySelector("section.reasoning") as HTMLElement;
+  expect(within(section).getByRole("heading", { level: 2, name: "Reasoning" })).toBeInTheDocument();
+  const items = Array.from(section.querySelectorAll("ul.why li"));
+  expect(items).toHaveLength(4);
+  expect(items[3].querySelector("strong")?.textContent).toBe("Confidence is medium because Akamai's cache headers are hidden.");
+  expect(items.slice(0, 3).some((li) => li.querySelector("strong"))).toBe(false);
+});
+
+test("a last sentence that is not about confidence stays regular weight", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] = "DNS points to Akamai. The edge strips its hit headers. The origin generated every response.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  expect(container.querySelector("ul.why strong")).toBeNull();
+});

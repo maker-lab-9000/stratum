@@ -9,18 +9,31 @@ import { isDegraded } from "./types";
 const VALIDATOR_NOTE = "citation check:";
 const stripPeriod = (s: string) => s.replace(/[.\s]+$/, "");
 
-// The model's reading: one or two sentences read as a paragraph; three or more
-// read as one point per sentence (1.3.3). The words are the model's, verbatim.
+// Reasoning (1.3.3): the model's overall_summary, ordered by the prompt from
+// the request outward to the origin, ending with the confidence sentence. One
+// or two sentences read as a paragraph; three or more as one point per
+// sentence, and a last point about confidence is set bold. The words are the
+// model's, verbatim.
 const POINTS_FROM = 3;
+const CONFIDENCE_LINE = /\bconfidence\b/i;
 function Summary({ text }: { text: string }) {
   const parts = sentences(text);
-  if (parts.length < POINTS_FROM) return <p className="why">{text}</p>;
+  const body =
+    parts.length < POINTS_FROM ? (
+      <p className="why">{text}</p>
+    ) : (
+      <ul className="why">
+        {parts.map((s, i) => {
+          const last = i === parts.length - 1;
+          return <li key={i}>{last && CONFIDENCE_LINE.test(s) ? <strong>{s}</strong> : s}</li>;
+        })}
+      </ul>
+    );
   return (
-    <ul className="why">
-      {parts.map((s, i) => (
-        <li key={i}>{s}</li>
-      ))}
-    </ul>
+    <section className="reasoning">
+      <h2>Reasoning</h2>
+      {body}
+    </section>
   );
 }
 
