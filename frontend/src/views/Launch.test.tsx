@@ -71,6 +71,7 @@ test("valid URL + defaults -> exact POST body + navigates to live run", async ()
       cache_bust_probe: true,
       extra_request_headers: {},
       geo_hint: null,
+      investigate: false,
     },
   });
   expect(navigateMock).toHaveBeenCalledWith("/runs/rep-123", { state: { requestCount: 4 } });
@@ -265,4 +266,20 @@ test("recent: a running analysis links to the live view", async () => {
   const link = await screen.findByRole("link", { name: "https://running.test/" });
   expect(link).toHaveAttribute("href", "/runs/run-1");
   expect((link.closest(".recent-row") as HTMLElement).textContent).toContain("Running…");
+});
+
+
+// --- 1.4.0 investigate mode -----------------------------------------------------
+
+test("investigate checkbox is off by default and posts investigate: true when ticked", async () => {
+  const user = userEvent.setup();
+  await renderLoaded();
+  await user.type(screen.getByLabelText("Page URL"), "https://x.test/");
+  await user.click(screen.getByText("More options"));
+  const box = screen.getByLabelText(/Let the model investigate/);
+  expect(box).not.toBeChecked();
+  await user.click(box);
+  await user.click(screen.getByRole("button", { name: /^analyze$/i }));
+  await waitFor(() => expect(createAnalysis).toHaveBeenCalled());
+  expect(vi.mocked(createAnalysis).mock.calls[0][0].options.investigate).toBe(true);
 });

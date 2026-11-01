@@ -54,6 +54,7 @@ export function Launch() {
   const [intervalMs, setIntervalMs] = useState("0");
   const [warm, setWarm] = useState(true);
   const [cacheBust, setCacheBust] = useState(true);
+  const [investigate, setInvestigate] = useState(false);
   const [geoHint, setGeoHint] = useState("");
   const [headers, setHeaders] = useState<HeaderRow[]>([{ name: "", value: "" }]);
   const [recent, setRecent] = useState<Report[]>([]);
@@ -156,6 +157,7 @@ export function Launch() {
         cache_bust_probe: cacheBust,
         extra_request_headers,
         geo_hint: geoHint.trim() || null,
+        investigate,
       },
     };
 
@@ -292,6 +294,10 @@ export function Launch() {
           <label className="check">
             <input type="checkbox" checked={cacheBust} onChange={(e) => setCacheBust(e.target.checked)} />
             Cache-bust probe (forced miss)
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={investigate} onChange={(e) => setInvestigate(e.target.checked)} />
+            Let the model investigate: up to 5 extra requests to this URL with headers it chooses
           </label>
           <div className="field">
             <span className="field-label">Custom request headers</span>
