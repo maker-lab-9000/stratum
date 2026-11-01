@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { bandDetail, bandNames, bandState, confidenceLevel, headlineFor, layerName, roleLabel, servedPhrase } from "./story";
+import { bandDetail, bandNames, bandState, confidenceLevel, headlineFor, layerName, roleLabel, sentences, servedPhrase } from "./story";
 import type { CacheVerdict, Layer } from "./types";
 
 const L = (over: Partial<Layer>): Layer => ({
@@ -127,5 +127,27 @@ describe("band names", () => {
     const dispatcher = L({ layer_name: "Apache Dispatcher", vendor: "Apache / AEM", cache_type: "disk cache" });
     expect(bandDetail(dispatcher, "Apache / AEM")).toBe("Apache Dispatcher, disk cache");
     expect(bandDetail(L({ layer_name: "Origin", vendor: "unknown", cache_type: "" }), "Origin")).toBe("");
+  });
+});
+
+describe("sentences", () => {
+  test("splits prose on sentence ends, keeping abbreviations and hostnames whole", () => {
+    const text =
+      "DNS and the network path point to Akamai. The CNAME chain runs www.kleinanzeigen.de -> edgekey.net -> akamaiedge.net, " +
+      "and the answering IP sits in AS20940 Akamai International B.V. (Berlin). Akamai's hit/miss headers are stripped. " +
+      "Server time stays around 130-170 ms, which fits an origin trip (i.e. no stored copy). Confidence is medium because the headers are hidden.";
+    expect(sentences(text)).toEqual([
+      "DNS and the network path point to Akamai.",
+      "The CNAME chain runs www.kleinanzeigen.de -> edgekey.net -> akamaiedge.net, and the answering IP sits in AS20940 Akamai International B.V. (Berlin).",
+      "Akamai's hit/miss headers are stripped.",
+      "Server time stays around 130-170 ms, which fits an origin trip (i.e. no stored copy).",
+      "Confidence is medium because the headers are hidden.",
+    ]);
+  });
+
+  test("handles question and exclamation ends, and empty input", () => {
+    expect(sentences("Is it cached? No! It is not.")).toEqual(["Is it cached?", "No!", "It is not."]);
+    expect(sentences("")).toEqual([]);
+    expect(sentences("One sentence without a period")).toEqual(["One sentence without a period"]);
   });
 });

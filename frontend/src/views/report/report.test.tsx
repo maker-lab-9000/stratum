@@ -425,3 +425,27 @@ test("hosted route says 1 hop", () => {
   const route = within(container.querySelector(".hosted") as HTMLElement).getByText("Route").parentElement as HTMLElement;
   expect(route.textContent).toContain("1 hop,");
 });
+
+// --- The model's reading: a long summary reads as points, a short one as prose --
+
+test("a summary of three or more sentences renders as one point per sentence", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] = "Akamai fronts the page. Its hit/miss headers are stripped. Server time is around 130-170 ms. The edge is a passthrough.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  const items = Array.from(container.querySelectorAll("ul.why li")).map((li) => li.textContent);
+  expect(items).toEqual([
+    "Akamai fronts the page.",
+    "Its hit/miss headers are stripped.",
+    "Server time is around 130-170 ms.",
+    "The edge is a passthrough.",
+  ]);
+  expect(container.querySelector("p.why")).toBeNull();
+});
+
+test("a summary of one or two sentences stays a paragraph", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>) };
+  llm["overall_summary"] = "Akamai fronts the page. Its hit/miss headers are stripped.";
+  const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
+  expect(container.querySelector("p.why")?.textContent).toBe("Akamai fronts the page. Its hit/miss headers are stripped.");
+  expect(container.querySelector("ul.why")).toBeNull();
+});

@@ -1,6 +1,6 @@
 import type { Report } from "../../api/client";
 import { Badge, ConfidenceMeter } from "../../components";
-import { confidenceLevel, headlineFor } from "./story";
+import { confidenceLevel, headlineFor, sentences } from "./story";
 import type { CacheVerdict } from "./types";
 import { isDegraded } from "./types";
 
@@ -8,6 +8,21 @@ import { isDegraded } from "./types";
 // the page's one loud element, and the "why" paragraph (1.3.0 redesign).
 const VALIDATOR_NOTE = "citation check:";
 const stripPeriod = (s: string) => s.replace(/[.\s]+$/, "");
+
+// The model's reading: one or two sentences read as a paragraph; three or more
+// read as one point per sentence (1.3.3). The words are the model's, verbatim.
+const POINTS_FROM = 3;
+function Summary({ text }: { text: string }) {
+  const parts = sentences(text);
+  if (parts.length < POINTS_FROM) return <p className="why">{text}</p>;
+  return (
+    <ul className="why">
+      {parts.map((s, i) => (
+        <li key={i}>{s}</li>
+      ))}
+    </ul>
+  );
+}
 
 function Rerun({ onRerun }: { onRerun?: () => void }) {
   return (
@@ -69,7 +84,7 @@ export function Answer({ report, onRerun }: { report: Report; onRerun?: () => vo
           )}
         </div>
       </div>
-      {summary && <p className="why">{summary}</p>}
+      {summary && <Summary text={summary} />}
     </>
   );
 }
