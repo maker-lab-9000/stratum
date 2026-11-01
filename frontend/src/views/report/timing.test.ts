@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { edgeRttMs, formatServerMs, isProbe, serverMs, splitSamples } from "./timing";
+import { edgeRttMs, formatServerMs, isInvestigation, isProbe, serverMs, splitSamples } from "./timing";
 import type { RawSample, SampleTiming } from "./types";
 
 const timing = (t: Partial<SampleTiming>): SampleTiming => ({
@@ -26,6 +26,20 @@ describe("timing helpers", () => {
     expect(found?.request).toBe(4);
     expect(isProbe(probe)).toBe(true);
     expect(splitSamples([sample(1)]).probe).toBeNull();
+  });
+
+  test("isProbe is only the cache-bust probe; investigation samples are split out", () => {
+    // 1.4.0 (Review Focus 3): with no cache-bust probe and an investigation
+    // request that busts the cache, "the probe" stays null.
+    const inv = sample(5, { probe: "investigation", investigation: { n: 1, headers: { "X-Debug": "1" }, cache_bust: true, reason: "r" } });
+    expect(isProbe(inv)).toBe(false);
+    expect(isInvestigation(inv)).toBe(true);
+    const split = splitSamples([sample(1), sample(2), inv]);
+    expect(split.requests.map((s) => s.request)).toEqual([1, 2]);
+    expect(split.probe).toBeNull();
+    expect(split.investigations.map((s) => s.request)).toEqual([5]);
+    // The original probe is still found when present.
+    expect(splitSamples([sample(1), sample(4, { probe: "cache_bust" }), inv]).probe?.request).toBe(4);
   });
 
   test("edge rtt is the first bare-TCP rtt_ms, never the DNS-inclusive connect_ms", () => {

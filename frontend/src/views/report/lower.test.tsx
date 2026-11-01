@@ -374,3 +374,22 @@ test("a very long changing-header value is clamped, with the full value on hover
   const { container: c2 } = render(<Progression verdict={v} samples={[short, vary(2, [["x-cache", "MISS"]])]} />);
   expect(c2.querySelector("table.prog td .clamp")).toBeNull();
 });
+
+
+// --- 1.4.0 investigate mode -------------------------------------------------------
+
+test("raw drawer labels investigation tabs and the progression keeps them out of its columns", () => {
+  const inv = {
+    ...samples(1)[0], request: 6, probe: "investigation",
+    investigation: { n: 1, headers: { "Fastly-Debug": "1" }, cache_bust: false, reason: "see the tiers" },
+  };
+  const all = [...samples(4), inv];
+  render(<RawDrawer samples={all} />);
+  expect(screen.getByRole("button", { name: "Investigation 1" })).toBeInTheDocument();
+
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const { container } = render(<Progression verdict={v} samples={all} />);
+  const heads = Array.from(container.querySelectorAll("table.prog thead th")).map((th) => th.textContent);
+  expect(heads).toHaveLength(5); // Signal + 4 requests, no investigation column
+  expect(heads.join(" ")).not.toContain("Request 6");
+});
