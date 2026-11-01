@@ -20,7 +20,7 @@ from app.pipeline.analyze import make_llm_analyze
 from app.pipeline.bundle import assemble_bundle
 from tests.http_test_server import RawHTTPServer, build_response, received_header
 
-MODEL = "claude-haiku-4-5"
+MODEL = os.environ.get("STRATUM_LIVE_MODEL", "claude-haiku-4-5")
 
 
 async def _responder(count, request):
