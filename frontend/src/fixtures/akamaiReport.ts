@@ -126,3 +126,75 @@ export const akamaiReport: Report = {
     performance_findings: (LLM_JSON.performance_findings as Record<string, unknown>[]).map((f) => ({ ...f, confidence: "high" })),
   },
 };
+
+// 1.4.0: the same report after an investigate-mode run — two extra requests,
+// the model's account, the pipeline's call log (the third call refused by the
+// budget) and two recommendations.
+const INVESTIGATION_SAMPLES = [
+  {
+    ...sample(6),
+    probe: "investigation",
+    investigation: { n: 1, headers: { "Pragma": "akamai-x-cache-on, akamai-x-get-cache-key" }, cache_bust: false, reason: "Reveal the edge cache state Akamai strips by default." },
+    headers: [...sample(6).headers, ["X-Cache", "TCP_MISS from a23-55-142-16.deploy.akamaitechnologies.com (AkamaiGHost/11.4.3) (-)"], ["X-Cache-Key", "/L/1234/567/1d/www.example-foods.com/"]],
+  },
+  {
+    ...sample(7),
+    ok: false,
+    status: undefined,
+    probe: "investigation",
+    investigation: { n: 2, headers: { "User-Agent": "Mozilla/5.0 (Android 14; Mobile)" }, cache_bust: false, reason: "Check whether a mobile User-Agent gets a cached variant." },
+    headers: [],
+    error: "ReadTimeout: timed out",
+  },
+];
+
+const INVESTIGATION_LOG = [
+  {
+    n: 1, request: 6, asked_at_ms: 1762034400000, answered_at_ms: 1762034400310,
+    model_said: "The edge strips its cache state; Akamai's Pragma debug tokens should reveal it.",
+    input: { headers: { "Pragma": "akamai-x-cache-on, akamai-x-get-cache-key" }, cache_bust: false, reason: "Reveal the edge cache state Akamai strips by default." },
+    sent: { url: "https://www.example-foods.com/", method: "GET", headers: [["Pragma", "akamai-x-cache-on, akamai-x-get-cache-key"]] },
+    response: { status: 200, http_version: "HTTP/2", peer_ip: "23.55.142.16", timing: { connect_ms: null, tls_ms: null, ttfb_ms: 46, total_ms: 52, rtt_ms: null }, header_count: INVESTIGATION_SAMPLES[0].headers.length },
+    returned: { request: 6, sample: INVESTIGATION_SAMPLES[0], timing: { request: 6, ttfb_ms: 46, server_ms: 20.5, facts: ["request 6 ttfb_ms: 46", "request 6 server_ms: 20.5"] } },
+    refused: null,
+  },
+  {
+    n: 2, request: 7, asked_at_ms: 1762034401500, answered_at_ms: 1762034411500,
+    model_said: "",
+    input: { headers: { "User-Agent": "Mozilla/5.0 (Android 14; Mobile)" }, reason: "Check whether a mobile User-Agent gets a cached variant." },
+    sent: { url: "https://www.example-foods.com/", method: "GET", headers: [["User-Agent", "Mozilla/5.0 (Android 14; Mobile)"]] },
+    response: { error: "ReadTimeout: timed out" },
+    returned: { request: 7, sample: INVESTIGATION_SAMPLES[1], timing: { request: 7, ttfb_ms: null, server_ms: null, facts: [] } },
+    refused: null,
+  },
+  {
+    n: 3, request: null, asked_at_ms: 1762034412000, answered_at_ms: 1762034412001,
+    model_said: "Let me retry the mobile request once more.",
+    input: { headers: { "User-Agent": "Mozilla/5.0 (Android 14; Mobile)" }, reason: "Retry the timed-out mobile request." },
+    sent: null, response: null,
+    returned: { error: "request refused: header 'Host' cannot be set" },
+    refused: "header_policy: header 'Host' cannot be set",
+  },
+];
+
+export const investigatedReport: Report = {
+  ...akamaiReport,
+  id: "investigated",
+  samples_json: [...(akamaiReport.samples_json as unknown[]), ...INVESTIGATION_SAMPLES],
+  llm_json: {
+    ...(akamaiReport.llm_json as Record<string, unknown>),
+    investigation: {
+      summary: "Akamai's debug tokens confirmed the edge misses; the mobile variant check timed out.",
+      steps: [
+        { request: 6, purpose: "Reveal the edge cache state Akamai strips by default.", observed: "X-Cache: TCP_MISS from the edge, so the miss is confirmed, and the cache key shows the plain URL." },
+        { request: 7, purpose: "Check whether a mobile User-Agent gets a cached variant.", observed: "No response within the timeout; nothing learned." },
+      ],
+    },
+    investigation_log: INVESTIGATION_LOG,
+    recommendations: [
+      { action: "Run the analysis from another region", reason: "Akamai's anycast edge may hold a different copy per PoP; a second vantage would show whether the miss is local.", confidence: "medium" },
+      { action: "Retry the mobile User-Agent request", reason: "The only variant check timed out, so the Vary question is still open." },
+    ],
+    usage: { input_tokens: 48210, output_tokens: 2140 },
+  },
+};

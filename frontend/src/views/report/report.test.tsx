@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { expect, test } from "vitest";
 
 import type { Report } from "../../api/client";
-import { akamaiReport, akamaiReportLegacy } from "../../fixtures/akamaiReport";
+import { akamaiReport, akamaiReportLegacy, investigatedReport } from "../../fixtures/akamaiReport";
 import { DnsPanel } from "./DnsPanel";
 import { ReportView } from "./ReportView";
 import type { CacheVerdict, Dns } from "./types";
@@ -468,4 +468,60 @@ test("a last sentence that is not about confidence stays regular weight", () => 
   llm["overall_summary"] = "DNS points to Akamai. The edge strips its hit headers. The origin generated every response.";
   const { container } = renderReport({ ...akamaiReport, llm_json: llm } as Report);
   expect(container.querySelector("ul.why strong")).toBeNull();
+});
+
+
+// --- 1.4.0 investigate mode: what the model tried + recommendations ----------------
+
+test("what the model tried lists every call including the refused one, with details", () => {
+  const { container } = renderReport(investigatedReport);
+  const tried = screen.getByRole("heading", { level: 2, name: "What the model tried" }).closest("section") as HTMLElement;
+  const rows = Array.from(tried.querySelectorAll(".tried-row"));
+  expect(rows).toHaveLength(3);
+  expect(rows[0]).toHaveTextContent("Pragma: akamai-x-cache-on, akamai-x-get-cache-key");
+  expect(rows[0]).toHaveTextContent("Reveal the edge cache state Akamai strips by default.");
+  expect(rows[0]).toHaveTextContent("200");
+  expect(rows[0]).toHaveTextContent("X-Cache: TCP_MISS from the edge, so the miss is confirmed");
+  expect(rows[1]).toHaveTextContent("no response: ReadTimeout: timed out");
+  expect(rows[2]).toHaveTextContent("refused: header_policy: header 'Host' cannot be set");
+  // Time offsets from the first call.
+  expect(rows[0]).toHaveTextContent("+0 s");
+  expect(rows[2]).toHaveTextContent("+12 s");
+  // The disclosure carries the model's words, the exact request and the tool result.
+  const details = rows[0].querySelector("details") as HTMLElement;
+  expect(details).toHaveTextContent("The edge strips its cache state; Akamai's Pragma debug tokens should reveal it.");
+  expect(details).toHaveTextContent("GET https://www.example-foods.com/");
+  expect(details.querySelector("pre.raw")).not.toBeNull();
+  // Section sits after the measured table and before the findings.
+  const headings = Array.from(container.querySelectorAll("h2")).map((h) => h.textContent);
+  expect(headings.indexOf("What the model tried")).toBeGreaterThan(headings.indexOf("What the requests showed"));
+  expect(headings.indexOf("What the model tried")).toBeLessThan(headings.indexOf("What to look at"));
+});
+
+test("recommendations render with confidence; absent when empty", () => {
+  renderReport(investigatedReport);
+  const recs = screen.getByRole("heading", { level: 2, name: "Recommendations" }).closest("section") as HTMLElement;
+  const items = Array.from(recs.querySelectorAll(".rec"));
+  expect(items).toHaveLength(2);
+  expect(items[0]).toHaveTextContent("Run the analysis from another region");
+  expect(within(items[0] as HTMLElement).getByRole("img", { name: "Confidence: medium" })).toBeInTheDocument();
+  expect(within(items[1] as HTMLElement).getByRole("img", { name: "Not rated" })).toBeInTheDocument();
+  const headings = Array.from(document.querySelectorAll("h2")).map((h) => h.textContent);
+  expect(headings.indexOf("Recommendations")).toBeGreaterThan(headings.indexOf("What to look at"));
+});
+
+test("a pre-1.4.0 report shows neither section and no note", () => {
+  renderReport(akamaiReport);
+  expect(screen.queryByText("What the model tried")).toBeNull();
+  expect(screen.queryByText("Recommendations")).toBeNull();
+  expect(screen.queryByText(/Investigate mode was requested/)).toBeNull();
+});
+
+test("unavailable note when the provider had no tools", () => {
+  const llm = { ...(akamaiReport.llm_json as Record<string, unknown>),
+    investigation: { requested: true, available: false, reason: "provider 'openrouter' has no tool support" },
+    investigation_log: [] };
+  renderReport({ ...akamaiReport, provider: "openrouter", llm_json: llm } as Report);
+  expect(screen.getByText("Investigate mode was requested, but openrouter has no tool support.")).toBeInTheDocument();
+  expect(screen.queryByText("What the model tried")).toBeNull();
 });

@@ -8,9 +8,11 @@ import { Claims } from "./Claims";
 import { Findings, timingCard } from "./Findings";
 import { Hosted } from "./Hosted";
 import { Progression } from "./Progression";
+import { Recommendations } from "./Recommendations";
 import { Strata } from "./Strata";
 import { edgeRttMs, splitSamples } from "./timing";
-import type { CacheVerdict, Finding, RawSample } from "./types";
+import { Tried } from "./Tried";
+import type { CacheVerdict, Finding, Investigation, InvestigationLogEntry, RawSample, Recommendation } from "./types";
 import { isDegraded } from "./types";
 
 // The report centerpiece. Loads by id (or renders an injected report, used by the
@@ -69,6 +71,11 @@ export function ReportView({ report: injected }: ReportViewProps) {
   const edgeRtt = edgeRttMs(requests);
   const security = (report.llm_json?.["security_findings"] as Finding[] | undefined) ?? [];
   const performance = (report.llm_json?.["performance_findings"] as Finding[] | undefined) ?? [];
+  // 1.4.0 investigate mode: the pipeline's call log, the model's account and its recommendations.
+  const investigationLog = (report.llm_json?.["investigation_log"] as InvestigationLogEntry[] | undefined) ?? [];
+  const investigation = (report.llm_json?.["investigation"] as Investigation | null | undefined) ?? null;
+  const recommendations = (report.llm_json?.["recommendations"] as Recommendation[] | undefined) ?? [];
+  const investigateUnavailable = investigation?.requested === true && investigation.available === false;
 
   return (
     <main className="page">
@@ -110,12 +117,21 @@ export function ReportView({ report: injected }: ReportViewProps) {
         </section>
       )}
 
+      <Tried log={investigationLog} investigation={investigation} samples={samples} />
+      {investigateUnavailable && (
+        <p className="note investigate-unavailable">
+          Investigate mode was requested, but {report.provider ?? "the provider"} has no tool support.
+        </p>
+      )}
+
       {verdict && (security.length > 0 || performance.length > 0 || timingCard(verdict.timing_check)) && (
         <section>
           <h2>What to look at</h2>
           <Findings security={security} performance={performance} timing={verdict.timing_check} />
         </section>
       )}
+
+      <Recommendations items={recommendations} />
 
       <Hosted report={report} />
 
