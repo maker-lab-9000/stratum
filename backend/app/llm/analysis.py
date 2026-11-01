@@ -20,6 +20,7 @@ from app.llm.base import DEFAULT_SETTINGS, LLMProvider, LLMSettings, ProviderErr
 from app.llm.prompt import INVESTIGATE_PROMPT, SYSTEM_PROMPT
 from app.llm.schema import StructuredResult
 
+_PREFILL = "{"  # 1.4.0: assistant prefill on the tools-path retry
 _RETRY_CORRECTION = (
     "Your previous response was not valid JSON matching the schema. "
     "Return ONLY the JSON object — no prose, no markdown code fences."
@@ -188,11 +189,19 @@ async def run_analysis_outcome(
         return run["text"]
 
     for attempt in range(attempts):
-        if attempt > 0:
-            state["messages"] = [*state["messages"], {"role": "user", "content": _RETRY_CORRECTION}]
+        prefilled = attempt > 0
+        if prefilled:
+            # The correction, then an assistant turn prefilled with "{": the
+            # model can only continue the JSON object, so a code fence (the
+            # failure seen live) cannot recur. Strictness is unchanged.
+            state["messages"] = [*state["messages"],
+                                 {"role": "user", "content": _RETRY_CORRECTION},
+                                 {"role": "assistant", "content": _PREFILL}]
         last_raw = await _with_backoff(
             one_round, max_attempts=max_call_attempts, max_total_s=max_backoff_total_s, sleep=sleep,
         )
+        if prefilled:
+            last_raw = _PREFILL + last_raw
         try:
             return AnalysisOutcome(result=parse_structured_result(last_raw), tool_calls=tool_calls, usage=usage)
         except (json.JSONDecodeError, ValidationError) as exc:

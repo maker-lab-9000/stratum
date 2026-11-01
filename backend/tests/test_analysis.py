@@ -562,8 +562,8 @@ async def test_tools_path_runs_scripted_calls_and_parses():
 async def test_invalid_json_after_tools_retries_in_same_transcript():
     provider = StubToolProvider([
         ("tool", "request_page", {"reason": "a"}, ""),
-        ("text", "not json"),
-        ("text", json.dumps(VALID_RESULT)),
+        ("text", "```json\n" + json.dumps(VALID_RESULT) + "\n```"),  # the failure seen live
+        ("text", json.dumps(VALID_RESULT)[1:]),  # the model continues the prefilled "{"
     ])
     _, call_tool = _tool_sink()
     outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m",
@@ -572,8 +572,9 @@ async def test_invalid_json_after_tools_retries_in_same_transcript():
     assert len(provider.received) == 2
     second = provider.received[1]
     # The second call continues the first transcript: bundle, tool_use, tool_result, bad text, correction.
-    assert [m["role"] for m in second] == ["user", "assistant", "user", "assistant", "user"]
-    assert second[-1]["content"].startswith("Your previous response was not valid JSON")
+    assert [m["role"] for m in second] == ["user", "assistant", "user", "assistant", "user", "assistant"]
+    assert second[-2]["content"].startswith("Your previous response was not valid JSON")
+    assert second[-1] == {"role": "assistant", "content": "{"}  # prefill: no fence possible
     assert len(provider.tool_calls_made) == 1  # the tool was not re-invoked
     assert len(outcome.tool_calls) == 1
 
