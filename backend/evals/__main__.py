@@ -16,7 +16,16 @@ from pathlib import Path
 
 from evals.capture import CaptureError, capture, non_2xx_summary
 from evals.case import CASES_DIR, CaseError, load_case, load_cases
-from evals.runner import RUNS_DIR, Analyze, SetupError, parse_model_spec, run_eval, write_results
+from evals.runner import (
+    INVESTIGATE_SUFFIX,
+    RUNS_DIR,
+    Analyze,
+    SetupError,
+    live_note,
+    parse_model_spec,
+    run_eval,
+    write_results,
+)
 from evals.table import render_table
 
 
@@ -32,6 +41,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--model", action="append", required=True, metavar="PROVIDER:MODEL",
                      help="repeatable, e.g. anthropic:claude-opus-4-8")
     run.add_argument("--case", action="append", metavar="NAME", help="repeatable; default: all cases")
+    run.add_argument("--investigate", action="store_true",
+                     help="also run every case with investigate mode on: LIVE requests to each case's URL")
     return parser
 
 
@@ -72,8 +83,15 @@ def main(
         run = asyncio.run(run_eval(
             cases, models, analyze=analyze, is_configured=is_configured,
             progress=lambda line: print(line, file=sys.stderr, flush=True),
+            investigate=args.investigate,
         ))
-        print(render_table(cases, [m.label for m in models], run.outcomes))
+        labels = [m.label for m in models]
+        notes = {}
+        if args.investigate:
+            labels = [lab for m in models for lab in (m.label, m.label + INVESTIGATE_SUFFIX)]
+            notes = {(r["case"], r["model"] + INVESTIGATE_SUFFIX): live_note(r)
+                     for r in run.records if r["investigate"]}
+        print(render_table(cases, labels, run.outcomes, notes=notes))
         print(f"results: {write_results(run, models, runs_dir, now=started)}")
         return 0
     except (CaseError, SetupError, CaptureError) as exc:

@@ -424,7 +424,9 @@ async def test_run_eval_two_models():
     assert bad.serving_ok is False
     assert len(run.records) == 2
     for record in run.records:
-        assert set(record) == {"case", "provider", "model", "duration_ms", "verdict_json", "llm_json"}
+        assert set(record) == {"case", "provider", "model", "duration_ms", "verdict_json", "llm_json",
+                               "investigate", "extra_requests", "tokens"}
+        assert record["investigate"] is False and record["extra_requests"] == 0 and record["tokens"] is None
 
 
 async def test_run_eval_unconfigured_provider_makes_no_calls():
@@ -731,3 +733,60 @@ def test_non_2xx_summary_ignores_probe():
     probe_200 = {**probe_403, "status": 200}
     assert non_2xx_summary(ok + [probe_403]) is None
     assert non_2xx_summary(blocked + [probe_200]) == "403×4"
+
+
+
+# --- 1.4.0: --investigate runs each case frozen and live ------------------------
+
+async def test_investigate_runs_each_case_twice_with_labels():
+    seen_options = []
+
+    async def analyze(bundle, provider, model, *, emit=None):
+        opts = bundle["meta"]["request_options"]
+        seen_options.append(opts)
+        out = {"verdict_json": {**VALID_RESULT["cache_verdict"], "validation": {"ok": True, "flags": []}},
+               "llm_json": dict(VALID_RESULT)}
+        if opts.get("investigate"):
+            out["llm_json"] = {**out["llm_json"], "investigation_log": [{"n": 1}, {"n": 2}, {"n": 3, "refused": "budget"}],
+                               "usage": {"input_tokens": 12000, "output_tokens": 400}}
+            out["samples"] = bundle["samples"] + [{"request": 5, "probe": "investigation"}]
+        return out
+
+    run = await run_eval([parse_case(_DISPATCHER_CASE)], [ModelSpec("fa", "m1")],
+                         analyze=analyze, is_configured=lambda p: True, investigate=True)
+    assert set(run.outcomes) == {("golden", "m1"), ("golden", "m1 +investigate")}
+    assert run.outcomes[("golden", "m1 +investigate")].serving_ok is True
+    assert seen_options[0].get("investigate") is None
+    assert seen_options[1]["investigate"] is True and seen_options[1]["extra_request_headers"] == {}
+    off, on = run.records
+    assert off["investigate"] is False and off["extra_requests"] == 0 and off["tokens"] is None
+    assert on["investigate"] is True and on["extra_requests"] == 2  # refused calls are not requests
+    assert on["tokens"] == {"input": 12000, "output": 400}
+    assert on["samples"][-1]["probe"] == "investigation"
+
+
+def test_table_shows_live_note_for_investigate_rows():
+    case = _scored_case()
+    outcomes = {
+        ("golden", "m1"): Outcome("Fastly shared cache (HIT)", _CHAIN_OK, True, True, 0),
+        ("golden", "m1 +investigate"): Outcome("Fastly shared cache (HIT)", _CHAIN_OK, True, True, 0),
+    }
+    out = render_table([case], ["m1", "m1 +investigate"], outcomes,
+                       notes={("golden", "m1 +investigate"): "live · 2 req · 12.4k tok"})
+    assert "live · 2 req · 12.4k tok" in _line_with(out, "m1 +investigate")
+    plain = [l for l in out.splitlines() if " m1 " in l and "+investigate" not in l and "score" not in l]
+    assert plain and all("live" not in l for l in plain)
+
+
+def test_cli_investigate_flag_parses(tmp_path):
+    seen = []
+
+    async def analyze(bundle, provider, model, *, emit=None):
+        seen.append(bool(bundle["meta"]["request_options"].get("investigate")))
+        return {"verdict_json": {**VALID_RESULT["cache_verdict"], "validation": {"ok": True, "flags": []}},
+                "llm_json": dict(VALID_RESULT)}
+
+    code = main(["run", "--model", "fa:m1", "--investigate"], analyze=analyze,
+                is_configured=lambda p: True, cases_dir=_cli_cases(tmp_path), runs_dir=tmp_path / "runs")
+    assert code == 0
+    assert seen == [False, True]

@@ -56,5 +56,5 @@ clean:
 eval-capture: ## Freeze a report into an eval case: make eval-capture REPORT=<link> NAME=<case>
 	@cd backend && uv run $(if $(wildcard .env),--env-file ../.env) python -m evals capture "$(REPORT)" --name "$(NAME)"
 
-eval: ## Replay eval cases: make eval MODELS="anthropic:<model> openrouter:<model>"
-	cd backend && uv run $(if $(wildcard .env),--env-file ../.env) python -m evals run $(foreach m,$(MODELS),--model $(m))
+eval: ## Replay eval cases: make eval MODELS="anthropic:<model> openrouter:<model>" [INVESTIGATE=1]
+	cd backend && uv run $(if $(wildcard .env),--env-file ../.env) python -m evals run $(foreach m,$(MODELS),--model $(m)) $(if $(INVESTIGATE),--investigate)
