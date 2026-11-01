@@ -19,6 +19,9 @@ import type { CacheVerdict, RawSample, SampleState } from "./types";
 // a rotating server id. Only values are compared, never names, so no vendor
 // logic; Date is skipped (the column heads already carry the clock). Rows sort
 // by fewest distinct values (flips before per-request ids), capped at six.
+// 1.3.2: a row whose every column holds a different random-looking id (hex
+// once separators are dropped, as in a UUID) folds into "Unique per request: …";
+// a cache-bust value equal to every request's spans the probe column too.
 const COLUMN_LIMIT = 6;
 const CHANGED_ROW_LIMIT = 6;
 const FIXED_HEADERS = ["age", "cache-control", "via"];
@@ -42,19 +45,31 @@ const stripClass = (state: string) => (state === "HIT" ? "h" : state === "UNKNOW
 
 const ms = (v: number | null | undefined) => (typeof v === "number" ? `${v} ms` : "—");
 
+// A value shaped like a random id: hex once separators are dropped (UUIDs,
+// trace ids). Value shape only — never the header name.
+function isOpaqueId(value: string): boolean {
+  const core = value.replace(/[-_.:]/g, "");
+  return /^[0-9a-f]{16,}$/i.test(core) && /\d/.test(core);
+}
+
 /** Headers whose value (absent = "—") differs across the given columns, fewest
  *  distinct values first; ties keep first-appearance order. Names keep the
- *  casing they were first captured with. */
-function changingHeaders(columns: RawSample[]): { name: string; distinct: number }[] {
+ *  casing they were first captured with. Rows of all-different random ids are
+ *  returned separately as `ids`. */
+function changingHeaders(columns: RawSample[]): { rows: { name: string; distinct: number }[]; ids: string[] } {
   const seen = new Map<string, string>();
   for (const s of columns) for (const [k] of s.headers) if (!seen.has(k.toLowerCase())) seen.set(k.toLowerCase(), k);
-  const out: { name: string; distinct: number }[] = [];
+  const rows: { name: string; distinct: number }[] = [];
+  const ids: string[] = [];
   for (const [lower, name] of seen) {
     if (SKIP_CHANGED.has(lower)) continue;
-    const distinct = new Set(columns.map((s) => headerValue(s, lower) ?? "—")).size;
-    if (distinct > 1) out.push({ name, distinct });
+    const values = columns.map((s) => headerValue(s, lower));
+    const distinct = new Set(values.map((v) => v ?? "—")).size;
+    if (distinct <= 1) continue;
+    if (distinct === columns.length && values.every((v) => v !== null && isOpaqueId(v))) ids.push(name);
+    else rows.push({ name, distinct });
   }
-  return out.sort((a, b) => a.distinct - b.distinct);
+  return { rows: rows.sort((a, b) => a.distinct - b.distinct), ids };
 }
 
 // "Request k" column header with a timing sub-label derived from started_at_ms
@@ -98,7 +113,7 @@ export function Progression({ verdict, samples }: { verdict: CacheVerdict | null
   ];
   const sent = (header: string) => [...requests, ...(probe ? [probe] : [])].some((s) => headerValue(s, header) !== null);
   const notSent = fixed.filter((f) => !sent(f.header)).map((f) => f.label);
-  const changed = changingHeaders(columns);
+  const { rows: changed, ids: uniqueIds } = changingHeaders(columns);
   const signals = [
     ...fixed.filter((f) => sent(f.header)),
     ...changed.slice(0, CHANGED_ROW_LIMIT).map(({ name }) => ({ label: name, header: name, muted: false })),
@@ -173,11 +188,13 @@ export function Progression({ verdict, samples }: { verdict: CacheVerdict | null
           const shown = values.map((v) => v ?? "—");
           const uniform = shown.every((v) => v === shown[0]);
           const cls = muted ? "flat" : undefined;
+          // 1.3.2: the probe repeats the requests' value → one cell across it too.
+          const probeSame = probeColumn && probe !== null && uniform && (headerValue(probe, header) ?? "—") === shown[0];
           return (
             <TableRow key={label}>
               <th scope="row">{label}</th>
               {compact || uniform ? (
-                <td colSpan={dataSpan} className={cls}>
+                <td colSpan={dataSpan + (probeSame ? 1 : 0)} className={cls}>
                   {uniform ? shown[0] : shown.join("  →  ")}
                 </td>
               ) : (
@@ -187,7 +204,7 @@ export function Progression({ verdict, samples }: { verdict: CacheVerdict | null
                   </td>
                 ))
               )}
-              {probe && probeCell(headerValue(probe, header) ?? "—", cls)}
+              {probe && !probeSame && probeCell(headerValue(probe, header) ?? "—", cls)}
             </TableRow>
           );
         })}
@@ -221,6 +238,7 @@ export function Progression({ verdict, samples }: { verdict: CacheVerdict | null
         </p>
       )}
       {notSent.length > 0 && <p className="prog-note">{`Not sent: ${notSent.join(", ")}.`}</p>}
+      {uniqueIds.length > 0 && <p className="prog-note">{`Unique per request: ${uniqueIds.join(", ")}.`}</p>}
       {moreChanged.length > 0 && (
         <p className="prog-note">{`Also changed between requests: ${moreChanged.join(", ")}.`}</p>
       )}

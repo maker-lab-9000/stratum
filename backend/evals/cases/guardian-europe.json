@@ -1,0 +1,991 @@
+{
+  "name": "guardian-europe",
+  "url": "https://www.theguardian.com/europe",
+  "source": {
+    "report_link": "http://localhost:8000/reports/dc1e4668-2eeb-4bce-842f-e0ea63d58a41",
+    "report_id": "dc1e4668-2eeb-4bce-842f-e0ea63d58a41",
+    "captured_at": "2026-11-01T17:18:02Z",
+    "vantage": "unknown vantage",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5"
+  },
+  "evidence": {
+    "dns": {
+      "a": [
+        "151.101.1.111",
+        "151.101.65.111",
+        "151.101.129.111",
+        "151.101.193.111"
+      ],
+      "aaaa": [],
+      "cname_chain": [
+        {
+          "name": "www.theguardian.com",
+          "cname": "dualstack.guardian.map.fastly.net",
+          "ttl": 4502
+        }
+      ],
+      "ns": [
+        "dns1.p04.nsone.net",
+        "dns2.p04.nsone.net",
+        "dns3.p04.nsone.net",
+        "dns4.p04.nsone.net",
+        "ns01.theguardiandns.com",
+        "ns02.theguardiandns.com",
+        "ns03.theguardiandns.com",
+        "ns04.theguardiandns.com"
+      ],
+      "ttl": 77,
+      "truncated": false
+    },
+    "samples": [
+      {
+        "request": 1,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.theguardian.com/europe",
+        "headers": [
+          [
+            "content-type",
+            "text/html; charset=UTF-8"
+          ],
+          [
+            "etag",
+            "W/\"hash8869308490756294913\""
+          ],
+          [
+            "link",
+            "<https://assets.guim.co.uk/polyfill.io/v3/polyfill.min.js?rum=0&features=es6%2Ces7%2Ces2017%2Ces2018%2Ces2019%2Cdefault-3.6%2CHTMLPictureElement%2CIntersectionObserver%2CIntersectionObserverEntry%2CURLSearchParams%2Cfetch%2CNodeList.prototype.forEach%2Cnavigator.sendBeacon%2Cperformance.now%2CPromise.allSettled&flags=gated&callback=guardianPolyfilled&unknown=polyfill&cacheClear=1>; rel=prefetch,<https://assets.guim.co.uk/assets/frameworks.client.web.c82a8172be7aa46261c9.js>; rel=prefetch,<https://assets.guim.co.uk/assets/index.client.web.595731627c86da48e330.js>; rel=prefetch,<https://assets.guim.co.uk/commercial/b35bb3b18d3f9790b0d8/graun.standalone.commercial.js>; rel=prefetch,,<https://assets.guim.co.uk/>; rel=preconnect,<https://i.guim.co.uk>; rel=preconnect,<https://j.ophan.co.uk>; rel=preconnect,<https://ophan.theguardian.com>; rel=preconnect,<https://api.nextgen.guardianapps.co.uk>; rel=preconnect,<https://hits-secure.theguardian.com>; rel=preconnect,<https://interactive.guim.co.uk>; rel=preconnect,<https://phar.gu-web.net>; rel=preconnect,<https://static.theguardian.com>; rel=preconnect,<https://support.theguardian.com>; rel=preconnect"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "x-gu-dotcomponents",
+            "true"
+          ],
+          [
+            "x-gu-server-ab-tests",
+            "fronts-and-curation-editorial-test:a"
+          ],
+          [
+            "x-gu-frontend-git-commit-id",
+            "abd49cf136dbbd5de1f8c781faa7a1ab10cf20b8"
+          ],
+          [
+            "onion-location",
+            "https://www.guardian2zotagl6tmjucg3lrhxdk4dw3lhbqnkvvkywawy3oqfoprid.onion/europe"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sun, 01 Nov 2026 16:46:06 GMT"
+          ],
+          [
+            "x-robots-tag",
+            "bingbot: noarchive"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=martech-header-sign-in-header-optimisation:control,growth-auxia-banner:control,commercial-spacefinder-highvalue-sections-set2:control; path=/; max-age=2592000; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=210; path=/; expires=Sat, 30 Jan 2027 16:46:06 GMT; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "GU_mvt_id=218772; expires=Sat, 30 Jan 2027 16:46:06 GMT; path=/; domain=.theguardian.com; Secure"
+          ],
+          [
+            "x-timer",
+            "S1793551567.618990,VS0,VE9"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "content-security-policy",
+            "upgrade-insecure-requests; default-src https:; script-src https: 'unsafe-inline' 'unsafe-eval' blob: 'unsafe-inline'; style-src https: 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src 'self' https://assets.guim.co.uk https://pasteup.guim.co.uk https://interactive.guim.co.uk https://dashboard.ophan.co.uk https://cdn.braze.eu data:; connect-src https: wss: blob:; child-src https: blob:; object-src 'none'; base-uri 'none'"
+          ],
+          [
+            "referrer-policy",
+            "no-referrer-when-downgrade"
+          ],
+          [
+            "feature-policy",
+            "camera 'none'; microphone 'none'; midi 'none'; geolocation 'none'"
+          ],
+          [
+            "permissions-policy",
+            "camera=(), microphone=(), midi=(), geolocation=(), interest-cohort=(), clipboard-read=(), unload=()"
+          ],
+          [
+            "x-gu-edition",
+            "eur"
+          ],
+          [
+            "cache-control",
+            "max-age=60, stale-while-revalidate=6, stale-if-error=864000, private"
+          ],
+          [
+            "age",
+            "0"
+          ],
+          [
+            "x-request-id",
+            "efd30094-759c-40f6-8cdc-49335e88b31b"
+          ],
+          [
+            "vary",
+            "Accept-Encoding,User-Agent"
+          ],
+          [
+            "set-cookie",
+            "GU_geo_country=DE; path=/; Secure"
+          ],
+          [
+            "alt-svc",
+            "h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400"
+          ],
+          [
+            "content-length",
+            "146760"
+          ]
+        ],
+        "elapsed_ms": 142.945,
+        "started_at_ms": 6.592,
+        "error": null,
+        "peer_ip": "151.101.1.111",
+        "timing": {
+          "connect_ms": 25.0,
+          "tls_ms": 34.9,
+          "ttfb_ms": 35.5,
+          "total_ms": 142.9,
+          "rtt_ms": 21.4
+        }
+      },
+      {
+        "request": 2,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.theguardian.com/europe",
+        "headers": [
+          [
+            "content-type",
+            "text/html; charset=UTF-8"
+          ],
+          [
+            "etag",
+            "W/\"hash8869308490756294913\""
+          ],
+          [
+            "link",
+            "<https://assets.guim.co.uk/polyfill.io/v3/polyfill.min.js?rum=0&features=es6%2Ces7%2Ces2017%2Ces2018%2Ces2019%2Cdefault-3.6%2CHTMLPictureElement%2CIntersectionObserver%2CIntersectionObserverEntry%2CURLSearchParams%2Cfetch%2CNodeList.prototype.forEach%2Cnavigator.sendBeacon%2Cperformance.now%2CPromise.allSettled&flags=gated&callback=guardianPolyfilled&unknown=polyfill&cacheClear=1>; rel=prefetch,<https://assets.guim.co.uk/assets/frameworks.client.web.c82a8172be7aa46261c9.js>; rel=prefetch,<https://assets.guim.co.uk/assets/index.client.web.595731627c86da48e330.js>; rel=prefetch,<https://assets.guim.co.uk/commercial/b35bb3b18d3f9790b0d8/graun.standalone.commercial.js>; rel=prefetch,,<https://assets.guim.co.uk/>; rel=preconnect,<https://i.guim.co.uk>; rel=preconnect,<https://j.ophan.co.uk>; rel=preconnect,<https://ophan.theguardian.com>; rel=preconnect,<https://api.nextgen.guardianapps.co.uk>; rel=preconnect,<https://hits-secure.theguardian.com>; rel=preconnect,<https://interactive.guim.co.uk>; rel=preconnect,<https://phar.gu-web.net>; rel=preconnect,<https://static.theguardian.com>; rel=preconnect,<https://support.theguardian.com>; rel=preconnect"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "x-gu-dotcomponents",
+            "true"
+          ],
+          [
+            "x-gu-server-ab-tests",
+            "fronts-and-curation-editorial-test:a"
+          ],
+          [
+            "x-gu-frontend-git-commit-id",
+            "abd49cf136dbbd5de1f8c781faa7a1ab10cf20b8"
+          ],
+          [
+            "onion-location",
+            "https://www.guardian2zotagl6tmjucg3lrhxdk4dw3lhbqnkvvkywawy3oqfoprid.onion/europe"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sun, 01 Nov 2026 16:46:06 GMT"
+          ],
+          [
+            "x-robots-tag",
+            "bingbot: noarchive"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=martech-header-sign-in-header-optimisation:control,growth-auxia-banner:control,commercial-spacefinder-highvalue-sections-set2:control; path=/; max-age=2592000; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=210; path=/; expires=Sat, 30 Jan 2027 16:46:06 GMT; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "GU_mvt_id=218772; expires=Sat, 30 Jan 2027 16:46:06 GMT; path=/; domain=.theguardian.com; Secure"
+          ],
+          [
+            "x-timer",
+            "S1793551567.697085,VS0,VE1"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "content-security-policy",
+            "upgrade-insecure-requests; default-src https:; script-src https: 'unsafe-inline' 'unsafe-eval' blob: 'unsafe-inline'; style-src https: 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src 'self' https://assets.guim.co.uk https://pasteup.guim.co.uk https://interactive.guim.co.uk https://dashboard.ophan.co.uk https://cdn.braze.eu data:; connect-src https: wss: blob:; child-src https: blob:; object-src 'none'; base-uri 'none'"
+          ],
+          [
+            "referrer-policy",
+            "no-referrer-when-downgrade"
+          ],
+          [
+            "feature-policy",
+            "camera 'none'; microphone 'none'; midi 'none'; geolocation 'none'"
+          ],
+          [
+            "permissions-policy",
+            "camera=(), microphone=(), midi=(), geolocation=(), interest-cohort=(), clipboard-read=(), unload=()"
+          ],
+          [
+            "x-gu-edition",
+            "eur"
+          ],
+          [
+            "cache-control",
+            "max-age=60, stale-while-revalidate=6, stale-if-error=864000, private"
+          ],
+          [
+            "age",
+            "0"
+          ],
+          [
+            "x-request-id",
+            "62d75268-e4e3-4eb2-bcad-476a3daae087"
+          ],
+          [
+            "vary",
+            "Accept-Encoding,User-Agent"
+          ],
+          [
+            "set-cookie",
+            "GU_geo_country=DE; path=/; Secure"
+          ],
+          [
+            "alt-svc",
+            "h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400"
+          ],
+          [
+            "content-length",
+            "146760"
+          ]
+        ],
+        "elapsed_ms": 33.988,
+        "started_at_ms": 149.77,
+        "error": null,
+        "peer_ip": "151.101.1.111",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 26.1,
+          "total_ms": 34.0,
+          "rtt_ms": null
+        }
+      },
+      {
+        "request": 3,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.theguardian.com/europe",
+        "headers": [
+          [
+            "content-type",
+            "text/html; charset=UTF-8"
+          ],
+          [
+            "etag",
+            "W/\"hash8869308490756294913\""
+          ],
+          [
+            "link",
+            "<https://assets.guim.co.uk/polyfill.io/v3/polyfill.min.js?rum=0&features=es6%2Ces7%2Ces2017%2Ces2018%2Ces2019%2Cdefault-3.6%2CHTMLPictureElement%2CIntersectionObserver%2CIntersectionObserverEntry%2CURLSearchParams%2Cfetch%2CNodeList.prototype.forEach%2Cnavigator.sendBeacon%2Cperformance.now%2CPromise.allSettled&flags=gated&callback=guardianPolyfilled&unknown=polyfill&cacheClear=1>; rel=prefetch,<https://assets.guim.co.uk/assets/frameworks.client.web.c82a8172be7aa46261c9.js>; rel=prefetch,<https://assets.guim.co.uk/assets/index.client.web.595731627c86da48e330.js>; rel=prefetch,<https://assets.guim.co.uk/commercial/b35bb3b18d3f9790b0d8/graun.standalone.commercial.js>; rel=prefetch,,<https://assets.guim.co.uk/>; rel=preconnect,<https://i.guim.co.uk>; rel=preconnect,<https://j.ophan.co.uk>; rel=preconnect,<https://ophan.theguardian.com>; rel=preconnect,<https://api.nextgen.guardianapps.co.uk>; rel=preconnect,<https://hits-secure.theguardian.com>; rel=preconnect,<https://interactive.guim.co.uk>; rel=preconnect,<https://phar.gu-web.net>; rel=preconnect,<https://static.theguardian.com>; rel=preconnect,<https://support.theguardian.com>; rel=preconnect"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "x-gu-dotcomponents",
+            "true"
+          ],
+          [
+            "x-gu-server-ab-tests",
+            "fronts-and-curation-editorial-test:a"
+          ],
+          [
+            "x-gu-frontend-git-commit-id",
+            "abd49cf136dbbd5de1f8c781faa7a1ab10cf20b8"
+          ],
+          [
+            "onion-location",
+            "https://www.guardian2zotagl6tmjucg3lrhxdk4dw3lhbqnkvvkywawy3oqfoprid.onion/europe"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sun, 01 Nov 2026 16:46:06 GMT"
+          ],
+          [
+            "x-robots-tag",
+            "bingbot: noarchive"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=martech-header-sign-in-header-optimisation:control,growth-auxia-banner:control,commercial-spacefinder-highvalue-sections-set2:control; path=/; max-age=2592000; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=210; path=/; expires=Sat, 30 Jan 2027 16:46:06 GMT; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "GU_mvt_id=218772; expires=Sat, 30 Jan 2027 16:46:06 GMT; path=/; domain=.theguardian.com; Secure"
+          ],
+          [
+            "x-timer",
+            "S1793551567.733662,VS0,VE2"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "content-security-policy",
+            "upgrade-insecure-requests; default-src https:; script-src https: 'unsafe-inline' 'unsafe-eval' blob: 'unsafe-inline'; style-src https: 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src 'self' https://assets.guim.co.uk https://pasteup.guim.co.uk https://interactive.guim.co.uk https://dashboard.ophan.co.uk https://cdn.braze.eu data:; connect-src https: wss: blob:; child-src https: blob:; object-src 'none'; base-uri 'none'"
+          ],
+          [
+            "referrer-policy",
+            "no-referrer-when-downgrade"
+          ],
+          [
+            "feature-policy",
+            "camera 'none'; microphone 'none'; midi 'none'; geolocation 'none'"
+          ],
+          [
+            "permissions-policy",
+            "camera=(), microphone=(), midi=(), geolocation=(), interest-cohort=(), clipboard-read=(), unload=()"
+          ],
+          [
+            "x-gu-edition",
+            "eur"
+          ],
+          [
+            "cache-control",
+            "max-age=60, stale-while-revalidate=6, stale-if-error=864000, private"
+          ],
+          [
+            "age",
+            "0"
+          ],
+          [
+            "x-request-id",
+            "f60f5f1d-5e3d-48b9-802e-691549d6688a"
+          ],
+          [
+            "vary",
+            "Accept-Encoding,User-Agent"
+          ],
+          [
+            "set-cookie",
+            "GU_geo_country=DE; path=/; Secure"
+          ],
+          [
+            "alt-svc",
+            "h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400"
+          ],
+          [
+            "content-length",
+            "146760"
+          ]
+        ],
+        "elapsed_ms": 35.407,
+        "started_at_ms": 183.829,
+        "error": null,
+        "peer_ip": "151.101.1.111",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 29.7,
+          "total_ms": 35.4,
+          "rtt_ms": null
+        }
+      },
+      {
+        "request": 4,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.theguardian.com/europe",
+        "headers": [
+          [
+            "content-type",
+            "text/html; charset=UTF-8"
+          ],
+          [
+            "etag",
+            "W/\"hash8869308490756294913\""
+          ],
+          [
+            "link",
+            "<https://assets.guim.co.uk/polyfill.io/v3/polyfill.min.js?rum=0&features=es6%2Ces7%2Ces2017%2Ces2018%2Ces2019%2Cdefault-3.6%2CHTMLPictureElement%2CIntersectionObserver%2CIntersectionObserverEntry%2CURLSearchParams%2Cfetch%2CNodeList.prototype.forEach%2Cnavigator.sendBeacon%2Cperformance.now%2CPromise.allSettled&flags=gated&callback=guardianPolyfilled&unknown=polyfill&cacheClear=1>; rel=prefetch,<https://assets.guim.co.uk/assets/frameworks.client.web.c82a8172be7aa46261c9.js>; rel=prefetch,<https://assets.guim.co.uk/assets/index.client.web.595731627c86da48e330.js>; rel=prefetch,<https://assets.guim.co.uk/commercial/b35bb3b18d3f9790b0d8/graun.standalone.commercial.js>; rel=prefetch,,<https://assets.guim.co.uk/>; rel=preconnect,<https://i.guim.co.uk>; rel=preconnect,<https://j.ophan.co.uk>; rel=preconnect,<https://ophan.theguardian.com>; rel=preconnect,<https://api.nextgen.guardianapps.co.uk>; rel=preconnect,<https://hits-secure.theguardian.com>; rel=preconnect,<https://interactive.guim.co.uk>; rel=preconnect,<https://phar.gu-web.net>; rel=preconnect,<https://static.theguardian.com>; rel=preconnect,<https://support.theguardian.com>; rel=preconnect"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "x-gu-dotcomponents",
+            "true"
+          ],
+          [
+            "x-gu-server-ab-tests",
+            "fronts-and-curation-editorial-test:a"
+          ],
+          [
+            "x-gu-frontend-git-commit-id",
+            "abd49cf136dbbd5de1f8c781faa7a1ab10cf20b8"
+          ],
+          [
+            "onion-location",
+            "https://www.guardian2zotagl6tmjucg3lrhxdk4dw3lhbqnkvvkywawy3oqfoprid.onion/europe"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sun, 01 Nov 2026 16:46:06 GMT"
+          ],
+          [
+            "x-robots-tag",
+            "bingbot: noarchive"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=martech-header-sign-in-header-optimisation:control,growth-auxia-banner:control,commercial-spacefinder-highvalue-sections-set2:control; path=/; max-age=2592000; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=210; path=/; expires=Sat, 30 Jan 2027 16:46:06 GMT; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "GU_mvt_id=218772; expires=Sat, 30 Jan 2027 16:46:06 GMT; path=/; domain=.theguardian.com; Secure"
+          ],
+          [
+            "x-timer",
+            "S1793551567.768048,VS0,VE4"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "content-security-policy",
+            "upgrade-insecure-requests; default-src https:; script-src https: 'unsafe-inline' 'unsafe-eval' blob: 'unsafe-inline'; style-src https: 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src 'self' https://assets.guim.co.uk https://pasteup.guim.co.uk https://interactive.guim.co.uk https://dashboard.ophan.co.uk https://cdn.braze.eu data:; connect-src https: wss: blob:; child-src https: blob:; object-src 'none'; base-uri 'none'"
+          ],
+          [
+            "referrer-policy",
+            "no-referrer-when-downgrade"
+          ],
+          [
+            "feature-policy",
+            "camera 'none'; microphone 'none'; midi 'none'; geolocation 'none'"
+          ],
+          [
+            "permissions-policy",
+            "camera=(), microphone=(), midi=(), geolocation=(), interest-cohort=(), clipboard-read=(), unload=()"
+          ],
+          [
+            "x-gu-edition",
+            "eur"
+          ],
+          [
+            "cache-control",
+            "max-age=60, stale-while-revalidate=6, stale-if-error=864000, private"
+          ],
+          [
+            "age",
+            "0"
+          ],
+          [
+            "x-request-id",
+            "c77986c0-ee77-4b50-bda7-739b7f7dd916"
+          ],
+          [
+            "vary",
+            "Accept-Encoding,User-Agent"
+          ],
+          [
+            "set-cookie",
+            "GU_geo_country=DE; path=/; Secure"
+          ],
+          [
+            "alt-svc",
+            "h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400"
+          ],
+          [
+            "content-length",
+            "146760"
+          ]
+        ],
+        "elapsed_ms": 35.305,
+        "started_at_ms": 219.312,
+        "error": null,
+        "peer_ip": "151.101.1.111",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 30.4,
+          "total_ms": 35.3,
+          "rtt_ms": null
+        }
+      },
+      {
+        "request": 5,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.theguardian.com/europe?stratum-cb=89e04f6ae7a02180",
+        "headers": [
+          [
+            "content-type",
+            "text/html; charset=UTF-8"
+          ],
+          [
+            "etag",
+            "W/\"hash8869308490756294913\""
+          ],
+          [
+            "link",
+            "<https://assets.guim.co.uk/polyfill.io/v3/polyfill.min.js?rum=0&features=es6%2Ces7%2Ces2017%2Ces2018%2Ces2019%2Cdefault-3.6%2CHTMLPictureElement%2CIntersectionObserver%2CIntersectionObserverEntry%2CURLSearchParams%2Cfetch%2CNodeList.prototype.forEach%2Cnavigator.sendBeacon%2Cperformance.now%2CPromise.allSettled&flags=gated&callback=guardianPolyfilled&unknown=polyfill&cacheClear=1>; rel=prefetch,<https://assets.guim.co.uk/assets/frameworks.client.web.c82a8172be7aa46261c9.js>; rel=prefetch,<https://assets.guim.co.uk/assets/index.client.web.595731627c86da48e330.js>; rel=prefetch,<https://assets.guim.co.uk/commercial/b35bb3b18d3f9790b0d8/graun.standalone.commercial.js>; rel=prefetch,,<https://assets.guim.co.uk/>; rel=preconnect,<https://i.guim.co.uk>; rel=preconnect,<https://j.ophan.co.uk>; rel=preconnect,<https://ophan.theguardian.com>; rel=preconnect,<https://api.nextgen.guardianapps.co.uk>; rel=preconnect,<https://hits-secure.theguardian.com>; rel=preconnect,<https://interactive.guim.co.uk>; rel=preconnect,<https://phar.gu-web.net>; rel=preconnect,<https://static.theguardian.com>; rel=preconnect,<https://support.theguardian.com>; rel=preconnect"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "x-gu-dotcomponents",
+            "true"
+          ],
+          [
+            "x-gu-server-ab-tests",
+            "fronts-and-curation-editorial-test:a"
+          ],
+          [
+            "x-gu-frontend-git-commit-id",
+            "abd49cf136dbbd5de1f8c781faa7a1ab10cf20b8"
+          ],
+          [
+            "onion-location",
+            "https://www.guardian2zotagl6tmjucg3lrhxdk4dw3lhbqnkvvkywawy3oqfoprid.onion/europe"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sun, 01 Nov 2026 16:46:06 GMT"
+          ],
+          [
+            "x-robots-tag",
+            "bingbot: noarchive"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_client_ab_tests=martech-header-sign-in-header-optimisation:control,growth-auxia-banner:control,commercial-spacefinder-highvalue-sections-set2:control; path=/; max-age=2592000; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=; path=/; max-age=0"
+          ],
+          [
+            "set-cookie",
+            "gu_v2_mvt_id=210; path=/; expires=Sat, 30 Jan 2027 16:46:06 GMT; domain=.theguardian.com; Secure"
+          ],
+          [
+            "set-cookie",
+            "GU_mvt_id=218772; expires=Sat, 30 Jan 2027 16:46:06 GMT; path=/; domain=.theguardian.com; Secure"
+          ],
+          [
+            "x-timer",
+            "S1793551567.888714,VS0,VE2"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "content-security-policy",
+            "upgrade-insecure-requests; default-src https:; script-src https: 'unsafe-inline' 'unsafe-eval' blob: 'unsafe-inline'; style-src https: 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src 'self' https://assets.guim.co.uk https://pasteup.guim.co.uk https://interactive.guim.co.uk https://dashboard.ophan.co.uk https://cdn.braze.eu data:; connect-src https: wss: blob:; child-src https: blob:; object-src 'none'; base-uri 'none'"
+          ],
+          [
+            "referrer-policy",
+            "no-referrer-when-downgrade"
+          ],
+          [
+            "feature-policy",
+            "camera 'none'; microphone 'none'; midi 'none'; geolocation 'none'"
+          ],
+          [
+            "permissions-policy",
+            "camera=(), microphone=(), midi=(), geolocation=(), interest-cohort=(), clipboard-read=(), unload=()"
+          ],
+          [
+            "x-gu-edition",
+            "eur"
+          ],
+          [
+            "cache-control",
+            "max-age=60, stale-while-revalidate=6, stale-if-error=864000, private"
+          ],
+          [
+            "age",
+            "0"
+          ],
+          [
+            "x-request-id",
+            "73ad754b-607e-405d-9ca2-1be461252126"
+          ],
+          [
+            "vary",
+            "Accept-Encoding,User-Agent"
+          ],
+          [
+            "set-cookie",
+            "GU_geo_country=DE; path=/; Secure"
+          ],
+          [
+            "alt-svc",
+            "h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400"
+          ],
+          [
+            "content-length",
+            "146760"
+          ]
+        ],
+        "elapsed_ms": 50.875,
+        "started_at_ms": 322.032,
+        "error": null,
+        "peer_ip": "151.101.1.111",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 44.6,
+          "total_ms": 50.9,
+          "rtt_ms": null
+        },
+        "probe": "cache_bust"
+      }
+    ],
+    "traceroute": {
+      "tool": "mtr",
+      "target": "www.theguardian.com",
+      "port": 443,
+      "timed_out": false,
+      "error": null,
+      "hops": [
+        {
+          "n": 1,
+          "ip": "172.23.0.1",
+          "rdns": null,
+          "asn": null,
+          "org": null,
+          "city": null,
+          "rtt_ms": 0.066,
+          "private": true,
+          "unresponsive": false,
+          "hint": null
+        },
+        {
+          "n": 2,
+          "ip": "151.101.1.111",
+          "rdns": null,
+          "asn": 54113,
+          "org": "Fastly, Inc.",
+          "city": null,
+          "rtt_ms": 19.775,
+          "private": false,
+          "unresponsive": false,
+          "hint": null
+        }
+      ],
+      "geo_available": true,
+      "enrichment_notes": [],
+      "seam": {
+        "status": "confirmed",
+        "traced_ip": "151.101.1.111",
+        "peer_ips": [
+          "151.101.1.111"
+        ]
+      }
+    }
+  },
+  "original_verdict": {
+    "cached": false,
+    "confidence": "low",
+    "provider": "Fastly",
+    "provider_evidence": [
+      "CNAME www.theguardian.com -> dualstack.guardian.map.fastly.net",
+      "ASN 54113 org: Fastly, Inc.",
+      "x-timer: S1793551567.618990,VS0,VE9"
+    ],
+    "serving_layer": "Guardian origin (frontend application)",
+    "layer_count_to_origin": 1,
+    "layers": [
+      {
+        "layer_name": "Fastly edge",
+        "vendor": "Fastly",
+        "cache_type": "CDN edge cache (Varnish-based)",
+        "role": "edge",
+        "caches": true,
+        "state": "UNKNOWN",
+        "evidence_headers": [
+          "x-timer: S1793551567.618990,VS0,VE9",
+          "x-timer: S1793551567.697085,VS0,VE1",
+          "age: 0"
+        ],
+        "confidence": "medium",
+        "location": ""
+      },
+      {
+        "layer_name": "Guardian origin (frontend application)",
+        "vendor": "The Guardian (self-hosted frontend)",
+        "cache_type": "application origin",
+        "role": "origin",
+        "caches": false,
+        "state": "UNKNOWN",
+        "evidence_headers": [
+          "x-gu-frontend-git-commit-id: abd49cf136dbbd5de1f8c781faa7a1ab10cf20b8",
+          "x-gu-dotcomponents: true",
+          "cache-control: max-age=60, stale-while-revalidate=6, stale-if-error=864000, private"
+        ],
+        "confidence": "medium",
+        "location": ""
+      }
+    ],
+    "sample_states": [
+      {
+        "request": 1,
+        "state": "UNKNOWN",
+        "evidence_headers": [
+          "age: 0",
+          "x-timer: S1793551567.618990,VS0,VE9"
+        ]
+      },
+      {
+        "request": 2,
+        "state": "UNKNOWN",
+        "evidence_headers": [
+          "age: 0",
+          "x-timer: S1793551567.697085,VS0,VE1"
+        ]
+      },
+      {
+        "request": 3,
+        "state": "UNKNOWN",
+        "evidence_headers": [
+          "age: 0",
+          "x-timer: S1793551567.733662,VS0,VE2"
+        ]
+      },
+      {
+        "request": 4,
+        "state": "UNKNOWN",
+        "evidence_headers": [
+          "age: 0",
+          "x-timer: S1793551567.768048,VS0,VE4"
+        ]
+      }
+    ],
+    "confidence_reason": "No hit/miss token is exposed and Age is 0 on every response, so no cache hit can be proven, yet timing and Fastly's 1–4 ms VE values suggest the edge may be serving from cache with Age reset.",
+    "timing_check": {
+      "status": "gap",
+      "summary": "Headers give no hit evidence (Age 0, no x-cache), implying origin delivery, but warm server time of 4.7–9.0 ms is edge-hit speed and well below the 23.2 ms cache-bust baseline; the probe itself reported age 0 with no hit token, so the baseline is usable. A cache at the Fastly edge is likely serving while hiding its state.",
+      "hidden_layer_suspected": true,
+      "confidence": "medium",
+      "evidence": [
+        "edge_rtt_ms: 21.4",
+        "request 1 server_ms: 14.1",
+        "warm server_ms min: 4.7",
+        "warm server_ms median: 8.3",
+        "warm server_ms max: 9.0",
+        "cache_bust server_ms: 23.2",
+        "cache_bust status: 200",
+        "age: 0"
+      ]
+    },
+    "headline": "No cache hit evidenced; Fastly edge state is unreadable",
+    "headline_detail": "Fastly fronts the page but exposes no x-cache token and Age stays 0 on all requests.",
+    "provider_confidence": "high",
+    "validation": {
+      "ok": true,
+      "flags": []
+    }
+  },
+  "expected": {
+    "serving": {
+      "label": "Fastly edge",
+      "match": [
+        "fastly",
+        "varnish"
+      ],
+      "role": [
+        "edge"
+      ]
+    },
+    "chain": [
+      {
+        "label": "Fastly edge",
+        "match": [
+          "fastly",
+          "varnish"
+        ],
+        "role": [
+          "edge"
+        ]
+      },
+      {
+        "label": "Fastly shield (LCY)",
+        "match": [
+          "fastly",
+          "varnish"
+        ],
+        "role": [
+          "shield"
+        ],
+        "optional": true
+      },
+      {
+        "label": "Guardian origin",
+        "role": [
+          "origin"
+        ]
+      }
+    ],
+    "notes": "Ground truth from a Fastly-Debug: 1 request on 2026-11-01: fastly-debug-ttl showed a HIT at the Frankfurt edge (object 19 s old) and a warm London shield behind it (fastly-debug-path cache-lcy-*); surrogate-control max-age=900 at the edge while browsers get max-age=60, private and Age: 0 (reset). The cache-bust query string was ignored (same fastly-debug-digest, still a HIT), so the probe is not an origin baseline. The shield is optional: nothing in this capture can reveal it. x-timer VE1-9 on every response, the probe included."
+  }
+}

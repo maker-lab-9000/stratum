@@ -12,9 +12,9 @@ from __future__ import annotations
 VENDOR_TABLE = """\
 | Vendor | Recognised by | Hit/miss read from |
 |---|---|---|
-| Akamai | `Via` contains `akamai`, CNAME `*.edgekey.net` / `*.akamaiedge.net`, `X-Cache(-Remote)` | `X-Cache`, `X-Cache-Remote` (`TCP_HIT`/`TCP_MISS`) |
+| Akamai | `Via` contains `akamai`, CNAME `*.edgekey.net` / `*.akamaiedge.net`, `X-Cache(-Remote)` | `X-Cache`, `X-Cache-Remote` (`TCP_HIT`/`TCP_MISS`); when stripped, the debug request header `Pragma: akamai-x-cache-on, akamai-x-cache-remote-on, akamai-x-check-cacheable, akamai-x-get-cache-key` makes the edge return them (plus `X-Check-Cacheable`, `X-Cache-Key`) |
 | Cloudflare | `Server: cloudflare`, `CF-Ray` | `CF-Cache-Status` |
-| Fastly | `X-Served-By`, `Via` contains `varnish`/`fastly` | `X-Cache` (`HIT`/`MISS`), `X-Cache-Hits` |
+| Fastly | `X-Served-By`, `Via` contains `varnish`/`fastly`, `x-timer`, CNAME `*.fastly.net` | `X-Cache` (`HIT`/`MISS`), `X-Cache-Hits`. When those are stripped: `x-timer` (`S<start>,VS0,VE<ms>`) — `VE` is the milliseconds the edge spent on the request: a few ms = served from this edge's cache; a shield hit adds one inter-tier round trip; a miss adds the origin trip and generation time. With the debug request header `Fastly-Debug: 1`: `fastly-debug-ttl` (one entry per tier, `(H <node> …)` = hit, `(M <node> …)` = miss) and `fastly-debug-path` (a second POP code in the node names = a shield tier) |
 | CloudFront | `Via` contains `cloudfront`, `X-Amz-Cf-Id` | `X-Cache` (`Hit/Miss from cloudfront`) |
 | Varnish (generic) | `Via`/`X-Varnish` | `X-Cache`, `X-Varnish` (2 IDs = hit) |
 | Apache dispatcher (AEM) | `Server: Apache`, `X-Dispatcher`, `Server-Timing: dispatcher;desc=…` | `Server-Timing` dispatcher token, `X-Cache-Info` |
@@ -58,7 +58,8 @@ OUTPUT_SCHEMA = """\
       "summary": "string",
       "hidden_layer_suspected": false,
       "confidence": "high|medium|low",
-      "evidence": ["string"]
+      "evidence": ["string"],
+      "probe_reached_origin": true
     }
   },
   "overall_summary": "string",
@@ -103,6 +104,7 @@ interpretive claim must be justified by evidence from the bundle.
 - Do not infer cache layers from traceroute hops. Traceroute stops at the CDN edge and cannot see past it.
 - The serving layer is the first layer in the user→origin chain reporting a hit. Count only cache-capable layers toward the layer count.
 - A non-zero `Age` on the response is direct, citable proof that a shared cache stored and served this object. If the outermost layer reports MISS/PASS but `Age` > 0, a cache **downstream of it** served the request: add that caching layer, mark it `HIT` citing `age: <value>`, and treat it as the serving layer. Never report `cached: false` — least of all at high confidence — while `Age` > 0.
+- A stripped hit token plus `Age: 0` on every response is not evidence of a miss. Some CDN configurations remove their hit/miss headers and reset `Age` to 0 — often rewriting `Cache-Control` to `private` or a short `max-age` for browsers while the edge keeps its own TTL in `Surrogate-Control` (normally stripped too; visible with a debug request header). Decide from what remains: an edge timer (Fastly's `x-timer` `VE`), debug headers (`fastly-debug-ttl`, Akamai `X-Cache`), and timing against a *valid* cache_bust baseline. If they show the edge serving, mark that layer `HIT` citing the header (e.g. `x-timer: S…,VS0,VE2`), set `cached: true` with it as the serving layer, and keep confidence at most `medium` unless a debug header confirms it. If nothing decides it, mark the states `UNKNOWN`, keep `confidence: low`, and make the `headline` say the cache state is hidden rather than that the origin served the page.
 - An outer CDN often overwrites the inner cache's `x-cache` / `Via` / `Server` with its own. Leaked fingerprints (`x-served-by: cache-*`, `x-timer` with `VS`/`VE` fields, `X-Varnish`) together with a non-zero `Age` reveal an inner cache tier even when its own hit token is gone — represent it as its own layer, naming it from the fingerprint (or `"unidentified shared cache"` with `role: unknown` if the vendor is unclear).
 - Your `cache_verdict` must not contradict your `segment_narration` or findings: if you narrate that an upstream cache served the object, `cached` must be `true` and that tier must be the serving layer.
 - Classify each layer's role (client / edge / shield / security / load balancer / reverse proxy / app cache / origin / unknown) and whether it caches. WAFs and load balancers forward without caching — report them as forwarding, never as cache misses.
@@ -134,16 +136,18 @@ a hit. "Reporting a hit" includes a downstream shared cache evidenced by a
 non-zero `Age` (see the rule above), not only explicit vendor HIT tokens — so a
 MISS at the outer edge does **not** mean nothing served from cache. Layer count
 to origin = number of cache-capable layers (`caches: true`) identified from the
-`Via` chain + vendor headers. `cached` is false only when **no** layer reports a
-hit **and** `Age` is absent/zero; then `serving_layer` names the origin layer — a
-valid, common verdict.
+`Via` chain + vendor headers. `cached` is false when the evidence shows the
+caches did not serve — MISS/PASS/BYPASS tokens, or `Age` flat at 0 together with
+`no-store`/`no-cache` and no other sign of a hit; `serving_layer` then names the
+origin layer — a valid, common verdict. A stripped hit token plus `Age: 0` alone
+is not evidence of a miss (see the rule above).
 
 ## Request-progression guidance (§4.3)
 
 The bundle gives you per-sample Age values and their deltas, and Cache-Control
 values. Interpret them:
 - Age climbing across consecutive requests → a shared cache is retaining the object.
-- Age flat at 0 with short/`no-cache` Cache-Control → that layer is NOT storing (e.g. CDN bypass — the classic flat-Age finding).
+- Age flat at 0 with short/`no-cache` Cache-Control → that layer is likely NOT storing (e.g. CDN bypass — the classic flat-Age finding) — unless its hit token is stripped and `Age` reset: check the edge timer and debug headers first (see the absolute rules).
 - Age **non-zero** while the outer edge reports MISS/PASS → the edge is a passthrough and a cache **behind it** served the object; the served-from layer is that downstream cache, not the edge. (Age flat but non-zero across closely-spaced requests is normal for a warm shared cache, not a bypass.)
 - Hit/miss transition between request 1 (cold) and later requests → warm-up behaviour.
 
@@ -164,14 +168,21 @@ How to read it (guidance, not fixed thresholds):
 - Each cache tier behind the edge adds roughly one inter-tier round trip — small
   when the tiers share a metro, larger across regions.
 - A full miss adds origin generation time; compare against the cache_bust
-  baseline. Check the probe's own response headers first: if the cache ignored
-  the query string (it reports a hit or a non-zero Age), the probe is not a full
-  origin trip and the baseline is unusable.
+  baseline — but only a valid one. The baseline is valid only if something on
+  the probe's own response shows it went past the caches: a MISS/BYPASS token, a
+  different `Age`, a much slower edge timer (e.g. a larger `x-timer` `VE`), or
+  headers the warm responses don't have. The `cache_bust differing headers` fact
+  lists what changed on the probe beyond the headers that vary on every warm
+  request anyway (`warm-varying headers`). `cache_bust differing headers: none`
+  means the probe looks exactly like the cached responses: the cache most likely
+  ignored the query string, it was not an origin trip, and the baseline is
+  unusable. `Age: 0` on the probe proves nothing when every response has `Age: 0`.
 
 Fill `timing_check`:
 - `gap` — timing contradicts the header story by an amount that clearly exceeds the warm spread. Examples: the headers say an inner tier or the origin served, but server time is at edge-hit speed and far below the cache_bust baseline (set `hidden_layer_suspected: true` — a cache closer than the one the headers name may be serving); or the headers say the edge HIT but server time is close to the cache_bust baseline. Lower `confidence` accordingly and say why in `confidence_reason`.
 - `consistent` — timing fits the header story, or the difference is inside the noise. If the tiers are plausibly too close to tell apart (e.g. same metro), say so in `summary` rather than suspecting a hidden layer.
 - `insufficient` — timing can't be trusted: no timing facts, the probe failed or was blocked or returned non-2xx, or the samples are block pages or redirects.
+- `probe_reached_origin`: `true` only when the probe's own response shows it went past the caches to the origin (see above); `false` when it looks like the cached responses or the cache ignored the query string; `null` when there was no probe. The report shows the probe's time on the origin band only when this is `true`.
 - `evidence` must include the timing facts you rely on, copied verbatim from `timing.facts`; it may also cite headers — cite the probe's headers as plain `name: value` (e.g. `age: 0`), not with a label in front.
 - Headers that appear only on the cache-bust probe may be cited only inside `timing_check` and for the origin layer (`role: origin`) — never for other layers, sample states, the provider, or findings. When the probe bypassed or missed the caches, its response came from the origin: use it to characterise the origin (platform, its own no-cache policy, cookies it sets).
 - `confidence` in `timing_check` is your confidence in the timing assessment itself; `confidence_reason` explains the overall `cache_verdict.confidence` in one sentence (empty if high and uncontested).
@@ -186,6 +197,7 @@ Fill `timing_check`:
 - `location`: a city or PoP for a layer, only when a captured header value or hop names it; otherwise an empty string. PoP or datacenter tokens in headers (airport-style codes in values such as `x-amz-cf-pop`, `x-served-by`, `cf-ray`, `x-rq`) are more reliable than GeoIP for anycast edges — prefer them over the hop city, and write just the token with the place it names (e.g. `hhn1 (Frankfurt-Hahn)`); the report shows any disagreement with GeoIP itself.
 - `Vary` lists the request headers that split the cache key: a value such as `X-Geo-Region` means the cache keeps a separate copy per region — mention it when it matters for the verdict or a finding.
 - Findings are things to fix or check (risks, misconfigurations, missed caching opportunities); never restate the verdict as a finding.
+- When a cache's hit/miss state is hidden (hit tokens stripped, `Age` reset) and the provider has a debug request header (see the vendor table), add an `info` performance finding suggesting a re-run with that header under More options → Custom request headers (e.g. `Fastly-Debug: 1`). Cite the header that shows the state is hidden.
 
 ## Provider identity (§4.5)
 

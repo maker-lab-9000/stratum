@@ -326,3 +326,36 @@ test("changing-header rows cap at six; the rest are named in a note", () => {
   expect(rowCells(container, "x-g")).toEqual([]);
   expect(screen.getByText("Also changed between requests: x-g, x-h.")).toBeInTheDocument();
 });
+
+// --- 1.3.2: matching probe spans; random per-request ids fold into a note ------
+
+test("a value the cache-bust shares with every request spans its column too", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const cc: [string, string] = ["cache-control", "max-age=60, private"];
+  const s = [vary(1, [cc]), vary(2, [cc]), vary(3, [cc]), vary(4, [cc], true)];
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "Cache-Control")).toEqual(["max-age=60, private"]);
+  const th = Array.from(container.querySelectorAll("tbody th")).find((el) => el.textContent === "Cache-Control")!;
+  expect(th.parentElement!.querySelector("td")).toHaveAttribute("colspan", "4");
+});
+
+test("random per-request ids fold into one line; other changing values keep their rows", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const ids = ["efd30094-759c-40f6-8cdc-49335e88b31b", "62d75268-e4e3-4eb2-bcad-476a3daae087", "f60f5f1d-5e3d-48b9-802e-691549d6688a"];
+  const s = [1, 2, 3].map((r) =>
+    vary(r, [["x-request-id", ids[r - 1]], ["x-timer", `S179355156${r}.6,VS0,VE${r}`], ["x-served-by", `cache-fra-etou822016${r}-FRA`]], r === 3),
+  );
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "x-request-id")).toEqual([]);
+  expect(rowCells(container, "x-timer")).toHaveLength(3);
+  expect(rowCells(container, "x-served-by")).toHaveLength(3);
+  expect(screen.getByText("Unique per request: x-request-id.")).toBeInTheDocument();
+});
+
+test("an id row stays when one column lacks it or two columns share a value", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const s = [vary(1, [["x-trace", "0123456789abcdef01"]]), vary(2, [["x-trace", "fedcba9876543210ff"]]), vary(3, [])];
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "x-trace")).toEqual(["0123456789abcdef01", "fedcba9876543210ff", "—"]);
+  expect(screen.queryByText(/Unique per request/)).toBeNull();
+});

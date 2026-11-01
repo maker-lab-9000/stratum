@@ -75,6 +75,18 @@ class TimingCheck(BaseModel):
     hidden_layer_suspected: bool = False
     confidence: Confidence = "low"
     evidence: list[str] = []
+    # 1.3.2: did the cache-bust probe really reach the origin? The model's call;
+    # None = not said. Coerced, never fails the parse.
+    probe_reached_origin: bool | None = None
+
+    @field_validator("probe_reached_origin", mode="before")
+    @classmethod
+    def _optional_bool(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+            return value.strip().lower() == "true"
+        return None
 
     @field_validator("summary", mode="before")
     @classmethod
