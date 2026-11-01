@@ -16,6 +16,8 @@ class AnalysisOptions(BaseModel):
     cache_bust_probe: bool = True
     extra_request_headers: dict[str, str] = Field(default_factory=dict)
     geo_hint: str | None = None
+    # 1.4.0: let the model request the URL again (up to 5 times) while it reads.
+    investigate: bool = False
 
 
 class CreateAnalysisRequest(BaseModel):

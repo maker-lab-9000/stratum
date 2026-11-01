@@ -145,16 +145,18 @@ async def run_analysis(
             return
 
         emit({"stage": "analyze", "status": "started"})
-        verdict = await _analyze(bundle, deps.analyze, provider, model)
+        verdict = await _analyze(bundle, deps.analyze, provider, model, emit)
         degraded = verdict["verdict_json"].get("status") == "unavailable"
+        # 1.4.0: investigate mode may have added samples — persist them too.
+        updates: dict = {"status": "done", "verdict_json": verdict["verdict_json"], "llm_json": verdict["llm_json"]}
+        if verdict.get("samples") is not None:
+            updates["samples_json"] = verdict["samples"]
+            llm = verdict.get("llm_json") or {}
+            emit({"stage": "investigate", "status": "completed",
+                  "data": {"count": sum(1 for e in (llm.get("investigation_log") or []) if not e.get("refused"))}})
         emit({"stage": "analyze", "status": "degraded" if degraded else "completed", "data": verdict["verdict_json"]})
 
-        repo.update(
-            report_id,
-            status="done",
-            verdict_json=verdict["verdict_json"],
-            llm_json=verdict["llm_json"],
-        )
+        repo.update(report_id, **updates)
         emit({"stage": "pipeline", "status": "done", "terminal": True, "degraded": degraded})
 
     except asyncio.CancelledError:
@@ -203,14 +205,24 @@ async def _collect(url, options, deps, emit):
     return dns, traceroute, warm, samples
 
 
-async def _analyze(bundle: dict, analyze, provider: str | None, model: str | None) -> dict:
+async def _analyze(bundle: dict, analyze, provider: str | None, model: str | None, emit=None) -> dict:
     """Run the LLM step. Any failure (or no LLM configured) yields the degraded
-    'unavailable' verdict — evidence is already persisted — never a raise (§2 #5)."""
+    'unavailable' verdict — evidence is already persisted — never a raise (§2 #5).
+    1.4.0: ``emit`` is offered to analyzers that stream investigation events;
+    older test fakes that take three arguments still work."""
     if analyze is None:
         return {"verdict_json": {"status": "unavailable", "reason": "LLM not configured"}, "llm_json": None}
     try:
-        result = await analyze(bundle, provider, model)
-        return {"verdict_json": result["verdict_json"], "llm_json": result.get("llm_json")}
+        try:
+            result = await analyze(bundle, provider, model, emit=emit)
+        except TypeError as exc:
+            if "emit" not in str(exc):
+                raise
+            result = await analyze(bundle, provider, model)
+        out = {"verdict_json": result["verdict_json"], "llm_json": result.get("llm_json")}
+        if result.get("samples") is not None:
+            out["samples"] = result["samples"]
+        return out
     except Exception as exc:  # noqa: BLE001
         return {
             "verdict_json": {"status": "unavailable", "reason": f"{type(exc).__name__}: {exc}"},

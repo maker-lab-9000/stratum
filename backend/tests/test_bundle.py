@@ -206,7 +206,7 @@ def test_no_gaps_on_healthy_inputs():
 
 # --- 1.2.0: timing corroboration ----------------------------------------------
 
-from app.pipeline.bundle import seam, timing_section  # noqa: E402
+from app.pipeline.bundle import sample_timing_facts, seam, timing_section  # noqa: E402
 
 
 def _timed(request, *, ttfb, connect=None, rtt=None, status=200, probe=False, peer="23.55.1.1", started=None):
@@ -251,7 +251,7 @@ def test_timing_section_arithmetic():
 
 def test_bundle_without_timing_fields():
     bundle = assemble_bundle(**akamai_inputs())
-    assert bundle["timing"] == {"edge_rtt_ms": None, "requests": [], "cache_bust": None, "facts": []}
+    assert bundle["timing"] == {"edge_rtt_ms": None, "requests": [], "cache_bust": None, "investigation": [], "facts": []}
 
 
 def test_spread_omitted_with_one_warm_value():
@@ -367,3 +367,37 @@ def test_no_header_diff_without_a_usable_probe():
     failed.update({"ok": False, "headers": []})
     facts = timing_section(requests + [failed])["facts"]
     assert not any("differing headers" in f or "warm-varying" in f for f in facts)
+
+
+def test_timing_section_keeps_investigation_out_of_requests_and_probe():
+    # 1.4.0: an investigation request (even a cache-busting one) is not one of
+    # the N requests and not the cache-bust probe; it gets its own rows + facts.
+    inv = _timed(3, ttfb=200.0)
+    inv["probe"] = "investigation"
+    inv["investigation"] = {"n": 1, "headers": {}, "cache_bust": True, "reason": "r"}
+    section = timing_section([_timed(1, ttfb=30.0, rtt=20.0), _timed(2, ttfb=28.0), inv])
+    assert [r["request"] for r in section["requests"]] == [1, 2]
+    assert section["cache_bust"] is None
+    assert section["investigation"] == [{"request": 3, "ttfb_ms": 200.0, "server_ms": 180.0}]
+    assert "request 3 ttfb_ms: 200.0" in section["facts"]
+    assert "request 3 server_ms: 180.0" in section["facts"]
+
+
+def test_sample_timing_facts_shape():
+    assert sample_timing_facts(_timed(7, ttfb=41.2), 20) == {
+        "request": 7, "ttfb_ms": 41.2, "server_ms": 21.2,
+        "facts": ["request 7 ttfb_ms: 41.2", "request 7 server_ms: 21.2"]}
+    assert sample_timing_facts(_timed(7, ttfb=41.2), None) == {
+        "request": 7, "ttfb_ms": 41.2, "server_ms": None, "facts": ["request 7 ttfb_ms: 41.2"]}
+
+
+
+def test_assemble_bundle_keeps_investigation_samples_out_of_progression_and_seam():
+    inputs = akamai_inputs()
+    inv = _sample(9, 5)
+    inv.update({"probe": "investigation", "peer_ip": "9.9.9.9",
+                "investigation": {"n": 1, "headers": {}, "cache_bust": False, "reason": "r"}})
+    inputs["samples"] = list(inputs["samples"]) + [inv]
+    bundle = assemble_bundle(**inputs)
+    assert 9 not in [None] and len(bundle["progression"]["age_values"]) == len(inputs["samples"]) - 1
+    assert "9.9.9.9" not in bundle["traceroute"]["seam"]["peer_ips"]

@@ -34,6 +34,7 @@ import httpx
 DEFAULT_REQUEST_COUNT = 4
 DEFAULT_TIMEOUT_MS = 10_000
 PROBE_MARKER = "cache_bust"
+INVESTIGATION_MARKER = "investigation"  # 1.4.0: a request the model asked for
 PROBE_PARAM = "stratum-cb"
 RTT_ATTEMPTS = 3
 RTT_TIMEOUT_S = 3.0
@@ -41,7 +42,12 @@ RTT_TIMEOUT_S = 3.0
 
 def is_probe(sample: dict) -> bool:
     """True for the cache-bust probe entry (not one of the N requests)."""
-    return isinstance(sample, dict) and bool(sample.get("probe"))
+    return isinstance(sample, dict) and sample.get("probe") == PROBE_MARKER
+
+
+def is_investigation(sample: dict) -> bool:
+    """True for a request the model asked for in investigate mode (1.4.0)."""
+    return isinstance(sample, dict) and sample.get("probe") == INVESTIGATION_MARKER
 
 
 def cache_bust_url(url: str) -> str:
@@ -78,10 +84,10 @@ async def sample_requests(
         for index in range(1, request_count + 1):
             if index > 1 and interval_ms > 0:
                 await asyncio.sleep(interval_ms / 1000)
-            samples.append(await _one_request(client, url, index, headers, start_ref))
+            samples.append(await one_request(client, url, index, headers, start_ref))
         await _attach_edge_rtt(samples, url)
         if cache_bust_probe:
-            probe = await _one_request(
+            probe = await one_request(
                 client, cache_bust_url(url), request_count + 1, headers, start_ref
             )
             probe["probe"] = PROBE_MARKER
@@ -90,7 +96,7 @@ async def sample_requests(
     return samples
 
 
-async def _one_request(
+async def one_request(
     client: httpx.AsyncClient,
     url: str,
     index: int,
@@ -210,3 +216,6 @@ async def _tcp_connect_ms(ip: str, port: int) -> float | None:
     except OSError:
         pass
     return round(elapsed, 1)
+
+
+_one_request = one_request  # 1.4.0: public name; alias kept for older imports

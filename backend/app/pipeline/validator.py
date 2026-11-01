@@ -41,6 +41,7 @@ import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 
+from app.collectors.http_sampler import is_investigation, is_probe
 from app.llm.schema import StructuredResult, TimingCheck
 
 _REASON = "citation not found in captured evidence"
@@ -105,7 +106,10 @@ class _EvidenceIndex:
         values: list[str] = []
 
         for sample in bundle.get("samples") or []:
-            if not include_probe and isinstance(sample, dict) and sample.get("probe"):
+            # 1.4.0: an investigation response is full evidence, unless the
+            # model asked for a cache-busting one — that is a forced miss like
+            # the original probe and follows the probe rule.
+            if not include_probe and _probe_like(sample):
                 continue
             for pair in sample.get("headers") or []:
                 if isinstance(pair, (list, tuple)) and len(pair) == 2:
@@ -181,6 +185,15 @@ class _EvidenceIndex:
 
         # 6. citation wraps a captured value
         return any(token in lowered for token in self._tokens)
+
+
+def _probe_like(sample) -> bool:
+    if is_probe(sample):
+        return True
+    return is_investigation(sample) and bool((sample.get("investigation") or {}).get("cache_bust"))
+
+
+_NO_SUCH_REQUEST = "cited request does not exist"
 
 
 def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult:
@@ -259,6 +272,14 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
             if ":" in header and not index.contains(header):
                 finding.confidence = "low"
                 flags.append(ValidationFlag(f"{section}[{i}].evidence_header", header, reason_for(header)))
+
+    # 1.4.0: each narrated investigation step must point at a real sample
+    # (existence only). Flagged, never dropped.
+    if verdict.investigation is not None:
+        numbers = {s.get("request") for s in bundle.get("samples") or [] if isinstance(s, dict)}
+        for i, step in enumerate(verdict.investigation.steps):
+            if step.request not in numbers:
+                flags.append(ValidationFlag(f"investigation.steps[{i}].request", str(step.request), _NO_SUCH_REQUEST))
 
     return ValidationResult(verdict=verdict, flags=flags)
 

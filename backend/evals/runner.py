@@ -22,7 +22,8 @@ from evals.score import Outcome, evaluate
 
 RUNS_DIR = Path(__file__).parent / "runs"
 
-Analyze = Callable[[dict, str, str], Awaitable[dict]]
+Analyze = Callable[..., Awaitable[dict]]  # analyze(bundle, provider, model, *, emit=None)
+INVESTIGATE_SUFFIX = " +investigate"
 
 
 class SetupError(Exception):
@@ -64,7 +65,14 @@ async def run_eval(
     analyze: Analyze,
     is_configured: Callable[[str], bool],
     progress: Callable[[str], None] = lambda _: None,
+    investigate: bool = False,
 ) -> EvalRun:
+    """With ``investigate`` (1.4.0) every case runs twice per model: ``off``
+    (frozen, as always) and ``on`` — the frozen bundle plus **live**
+    ``request_page`` calls to the case's URL, labelled ``<model> +investigate``.
+    The eval's rule of never touching the target is suspended for those rows
+    only; cases record no custom request headers, so the live calls carry only
+    the model's."""
     if not models:
         raise SetupError("at least one model is required")
     labels = [m.label for m in models]
@@ -88,30 +96,76 @@ async def run_eval(
             ) from exc
 
     run = EvalRun()
-    total = len(cases) * len(models)
+    modes = [False, True] if investigate else [False]
+    total = len(cases) * len(models) * len(modes)
     k = 0
     for case in cases:
         bundle = bundles[case.name]
         for spec in models:
-            k += 1
-            progress(f"[{k}/{total}] {case.name} × {spec.label}")
-            started = time.perf_counter()
-            try:
-                result = await analyze(bundle, spec.provider, spec.model)
-                verdict_json, llm_json = result["verdict_json"], result.get("llm_json")
-            except Exception as exc:  # noqa: BLE001 — one bad call must not stop the run
-                verdict_json = {"status": "unavailable", "reason": f"{type(exc).__name__}: {exc}"}
-                llm_json = None
-            run.outcomes[(case.name, spec.label)] = evaluate(case, verdict_json)
-            run.records.append({
-                "case": case.name,
-                "provider": spec.provider,
-                "model": spec.model,
-                "duration_ms": round((time.perf_counter() - started) * 1000),
-                "verdict_json": verdict_json,
-                "llm_json": llm_json,
-            })
+            for live in modes:
+                k += 1
+                label = spec.label + (INVESTIGATE_SUFFIX if live else "")
+                progress(f"[{k}/{total}] {case.name} × {label}")
+                started = time.perf_counter()
+                target = bundle
+                if live:
+                    meta = {**bundle["meta"], "request_options": {
+                        **bundle["meta"].get("request_options", {}),
+                        "investigate": True, "extra_request_headers": {}}}
+                    target = {**bundle, "meta": meta}
+                result: dict = {}
+                try:
+                    result = await analyze(target, spec.provider, spec.model)
+                    verdict_json, llm_json = result["verdict_json"], result.get("llm_json")
+                except Exception as exc:  # noqa: BLE001 — one bad call must not stop the run
+                    verdict_json = {"status": "unavailable", "reason": f"{type(exc).__name__}: {exc}"}
+                    llm_json = None
+                run.outcomes[(case.name, label)] = evaluate(case, verdict_json)
+                record = {
+                    "case": case.name,
+                    "provider": spec.provider,
+                    "model": spec.model,
+                    "duration_ms": round((time.perf_counter() - started) * 1000),
+                    "verdict_json": verdict_json,
+                    "llm_json": llm_json,
+                    "investigate": live,
+                    "extra_requests": _extra_requests(llm_json),
+                    "tokens": _tokens(llm_json),
+                }
+                if live:
+                    record["tool_calls"] = (llm_json or {}).get("investigation_log") or []
+                    record["samples"] = result.get("samples") or []
+                run.records.append(record)
     return run
+
+
+def _extra_requests(llm_json: dict | None) -> int:
+    """Requests actually made (refused calls don't count)."""
+    log = (llm_json or {}).get("investigation_log") or []
+    return sum(1 for entry in log if not entry.get("refused"))
+
+
+def _tokens(llm_json: dict | None) -> dict | None:
+    usage = (llm_json or {}).get("usage")
+    if not isinstance(usage, dict):
+        return None
+    return {"input": int(usage.get("input_tokens") or 0), "output": int(usage.get("output_tokens") or 0)}
+
+
+def row_note(record: dict) -> str:
+    """The table note for any row: ``frozen · 12.4k tok · 8 s`` for an off row,
+    ``live · 2 req · 12.4k tok · 31 s`` for an investigate row (final review:
+    the cost delta the experiment measures must be readable for both)."""
+    tokens = record.get("tokens") or {}
+    total = tokens.get("input", 0) + tokens.get("output", 0)
+    tok = f"{total / 1000:.1f}k tok" if total else "tokens n/a"
+    secs = f"{round((record.get('duration_ms') or 0) / 1000)} s"
+    if record.get("investigate"):
+        return f"live · {record.get('extra_requests', 0)} req · {tok} · {secs}"
+    return f"frozen · {tok} · {secs}"
+
+
+live_note = row_note  # kept for callers of the earlier name
 
 
 def write_results(

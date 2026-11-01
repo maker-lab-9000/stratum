@@ -107,7 +107,11 @@ def build_case(report: dict, *, name: str, link: str, now: datetime) -> dict:
     status = report.get("status")
     if status != "done":
         raise CaptureError(f"report status is {status!r}; only finished ('done') reports can be frozen")
-    samples = report.get("samples_json") or []
+    # 1.4.0: a report from an investigate-mode run carries the model's own
+    # requests; a frozen case keeps only the deterministic collection, so the
+    # eval's "off" baseline never reads the model's probes as evidence.
+    samples = [s for s in (report.get("samples_json") or [])
+               if not (isinstance(s, dict) and s.get("probe") == "investigation")]
     if not any(isinstance(s, dict) and s.get("ok") for s in samples):
         raise CaptureError("report has no successful samples — nothing to evaluate")
     verdict = report.get("verdict_json")

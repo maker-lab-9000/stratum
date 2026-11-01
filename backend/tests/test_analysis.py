@@ -438,3 +438,231 @@ def test_prompt_hidden_cache_guidance():
         assert marker in SYSTEM_PROMPT, marker
     # The forced origin default is gone.
     assert "then `serving_layer` names the origin layer" not in SYSTEM_PROMPT
+
+
+# --- 1.4.0: investigate mode schema + prompt ---------------------------------
+
+from app.llm.prompt import INVESTIGATE_PROMPT, OUTPUT_SCHEMA  # noqa: E402
+
+
+def test_result_without_investigation_fields_still_parses():
+    parsed = StructuredResult.model_validate(copy.deepcopy(VALID_RESULT))
+    assert parsed.investigation is None
+    assert parsed.recommendations == []
+
+
+def test_investigation_and_recommendations_parse_and_coerce():
+    data = copy.deepcopy(VALID_RESULT)
+    data["investigation"] = {"summary": "Two probes.", "steps": [
+        {"request": 6, "purpose": "see tiers", "observed": "two tiers, both miss"}]}
+    data["recommendations"] = [
+        {"action": "Run from another region", "reason": "anycast edge", "confidence": "High"},
+        {"action": "Compare with origin", "reason": "no debug header available"}]
+    parsed = StructuredResult.model_validate(data)
+    assert parsed.investigation.steps[0].request == 6
+    assert parsed.recommendations[0].confidence == "high"
+    assert parsed.recommendations[1].confidence is None
+
+
+def test_investigate_prompt_markers():
+    for marker in ("## Investigating", "request_page", "up to 5", "investigation.steps",
+                   "recommendations", "`reason`"):
+        assert marker in INVESTIGATE_PROMPT, marker
+    assert INVESTIGATE_PROMPT not in SYSTEM_PROMPT  # appended only when the tool is offered
+    assert "did send it yourself" in SYSTEM_PROMPT
+
+
+def test_output_schema_lists_investigation_keys():
+    assert '"investigation"' in OUTPUT_SCHEMA and '"recommendations"' in OUTPUT_SCHEMA
+    assert '"observed"' in OUTPUT_SCHEMA and '"action"' in OUTPUT_SCHEMA
+
+
+# --- 1.4.0: the tools path of run_analysis ---------------------------------------
+
+from app.llm.analysis import AnalysisOutcome, run_analysis_outcome  # noqa: E402
+from app.llm.base import NUDGE, ProviderError, ToolRun  # noqa: E402
+
+
+class StubToolProvider(FakeProvider):
+    """Scripted tool-use conversation. ``turns`` is a list of
+    ("tool", name, input, model_said) | ("text", str) | Exception items; each
+    analyze_with_tools call consumes turns until a "text" (or the exception).
+    Records the ``messages`` it receives on every call."""
+
+    id = "stubtools"
+
+    def __init__(self, turns: list) -> None:
+        super().__init__([])
+        self._turns = list(turns)
+        self.received: list[list[dict]] = []
+        self.tool_calls_made: list[tuple] = []
+
+    def supports_tools(self) -> bool:
+        return True
+
+    async def analyze_with_tools(self, *, system, messages, model, tools, call_tool, settings,
+                                 max_rounds=8, tool_calls=None):
+        self.received.append([dict(m) for m in messages])
+        self.calls.append({"system": system, "model": model, "tools": tools})
+        transcript = messages  # extended in place, as the real provider does
+        tool_calls = tool_calls if tool_calls is not None else []
+        while True:
+            turn = self._turns.pop(0)
+            if isinstance(turn, Exception):
+                raise turn
+            if turn[0] == "text":
+                transcript.append({"role": "assistant", "content": [{"type": "text", "text": turn[1]}]})
+                return ToolRun(text=turn[1], tool_calls=tool_calls,
+                               usage={"input_tokens": 10, "output_tokens": 5},
+                               messages=transcript, stop_reason="end_turn")
+            _, name, tool_input, said = turn
+            result = await call_tool(name, tool_input, said)
+            self.tool_calls_made.append((name, tool_input, said))
+            tool_calls.append({"id": f"tu_{len(tool_calls) + 1}", "name": name, "input": tool_input,
+                               "result": result, "model_said": said})
+            transcript.append({"role": "assistant", "content": [{"type": "tool_use", "id": f"tu_{len(tool_calls)}",
+                                                                 "name": name, "input": tool_input}]})
+            transcript.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": f"tu_{len(tool_calls)}",
+                                                            "content": json.dumps(result)}]})
+
+
+TOOLS = [{"name": "request_page"}]
+
+
+def _tool_sink():
+    seen = []
+
+    async def call_tool(name, tool_input, said):
+        seen.append((name, tool_input, said))
+        return {"request": 6}
+
+    return seen, call_tool
+
+
+async def test_tools_path_runs_scripted_calls_and_parses():
+    provider = StubToolProvider([
+        ("tool", "request_page", {"headers": {"X-A": "1"}, "reason": "a"}, "first"),
+        ("tool", "request_page", {"headers": {"X-B": "2"}, "reason": "b"}, ""),
+        ("text", json.dumps(VALID_RESULT)),
+    ])
+    seen, call_tool = _tool_sink()
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m",
+                                         tools=TOOLS, call_tool=call_tool)
+    assert isinstance(outcome, AnalysisOutcome)
+    assert outcome.result.cache_verdict.serving_layer == "Apache Dispatcher"
+    assert len(outcome.tool_calls) == 2 and outcome.usage == {"input_tokens": 10, "output_tokens": 5}
+    assert seen == [("request_page", {"headers": {"X-A": "1"}, "reason": "a"}, "first"),
+                    ("request_page", {"headers": {"X-B": "2"}, "reason": "b"}, "")]
+    # The system prompt carries the investigating section; the user turn is the bundle.
+    assert provider.calls[0]["system"].startswith(SYSTEM_PROMPT) and "## Investigating" in provider.calls[0]["system"]
+    assert provider.calls[0]["tools"] == TOOLS
+    assert provider.received[0] == [{"role": "user", "content": json.dumps(AKAMAI_BUNDLE, indent=2, ensure_ascii=False)}]
+
+
+async def test_invalid_json_after_tools_retries_in_same_transcript():
+    provider = StubToolProvider([
+        ("tool", "request_page", {"reason": "a"}, ""),
+        ("text", "```json\n" + json.dumps(VALID_RESULT) + "\n```"),  # the failure seen live
+        ("text", json.dumps(VALID_RESULT)[1:]),  # the model continues the prefilled "{"
+    ])
+    _, call_tool = _tool_sink()
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m",
+                                         tools=TOOLS, call_tool=call_tool)
+    assert outcome.result.cache_verdict.provider == "Akamai"
+    assert len(provider.received) == 2
+    second = provider.received[1]
+    # The second call continues the first transcript: bundle, tool_use, tool_result, bad text, correction.
+    assert [m["role"] for m in second] == ["user", "assistant", "user", "assistant", "user", "assistant"]
+    assert second[-2]["content"].startswith("Your previous response was not valid JSON")
+    assert second[-1] == {"role": "assistant", "content": "{"}  # prefill: no fence possible
+    assert len(provider.tool_calls_made) == 1  # the tool was not re-invoked
+    assert len(outcome.tool_calls) == 1
+
+
+async def test_two_invalid_after_tools_raise_parse_error():
+    provider = StubToolProvider([
+        ("tool", "request_page", {"reason": "a"}, ""),
+        ("text", "nope"), ("text", "still nope"),
+    ])
+    seen, call_tool = _tool_sink()
+    with pytest.raises(AnalysisParseError) as excinfo:
+        await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m", tools=TOOLS, call_tool=call_tool)
+    assert excinfo.value.attempts == 2
+    assert len(seen) == 1  # the sample was collected before the failure (persisted by the caller)
+
+
+async def test_transient_error_mid_loop_continues_transcript():
+    provider = StubToolProvider([
+        ("tool", "request_page", {"reason": "a"}, ""),
+        ProviderError("503", provider="stubtools", retryable=True, kind="transient", status_code=503),
+        ("text", json.dumps(VALID_RESULT)),
+    ])
+    seen, call_tool = _tool_sink()
+    waits = []
+
+    async def _sleep(d):
+        waits.append(d)
+
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m",
+                                         tools=TOOLS, call_tool=call_tool, sleep=_sleep)
+    assert outcome.result.cache_verdict.provider == "Akamai"
+    assert waits == [1.0]
+    assert len(provider.received) == 2
+    # The retry carries the tool turn already made; the tool is not called again.
+    assert [m["role"] for m in provider.received[1]] == ["user", "assistant", "user"]
+    assert len(seen) == 1 and len(outcome.tool_calls) == 1
+
+
+async def test_provider_without_tools_falls_back_to_plain():
+    provider = FakeProvider([json.dumps(VALID_RESULT)])
+    seen, call_tool = _tool_sink()
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m", tools=TOOLS, call_tool=call_tool)
+    assert outcome.tool_calls == [] and outcome.usage == {} and seen == []
+    assert "## Investigating" not in provider.calls[0]["system"]
+
+
+async def test_run_analysis_keeps_returning_a_structured_result():
+    provider = FakeProvider([json.dumps(VALID_RESULT)])
+    result = await run_analysis(AKAMAI_BUNDLE, provider=provider, model="m")
+    assert isinstance(result, StructuredResult)
+
+
+async def test_prefill_rejected_by_model_falls_back_to_plain_correction():
+    # Final review fix: Opus 4.8 / Sonnet 5 return 400 on assistant prefill.
+    class NoPrefill(StubToolProvider):
+        async def analyze_with_tools(self, *, messages, **kw):
+            if messages and messages[-1].get("role") == "assistant":
+                self.received.append([dict(m) for m in messages])
+                raise ProviderError("This model does not support assistant message prefill",
+                                    provider="stubtools", retryable=False, kind="invalid_request", status_code=400)
+            return await super().analyze_with_tools(messages=messages, **kw)
+
+    provider = NoPrefill([
+        ("tool", "request_page", {"reason": "a"}, ""),
+        ("text", "```json\n{}\n```"),
+        ("text", json.dumps(VALID_RESULT)),
+    ])
+    _, call_tool = _tool_sink()
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m", tools=TOOLS, call_tool=call_tool)
+    assert outcome.result.cache_verdict.provider == "Akamai"
+    # Three calls: the first round, the rejected prefilled retry, the plain retry
+    # whose transcript ends with the correction as a user turn.
+    assert len(provider.received) == 3
+    assert provider.received[2][-1]["role"] == "user"
+    assert provider.received[2][-1]["content"].startswith("Your previous response was not valid JSON")
+    assert len(outcome.tool_calls) == 1
+
+
+async def test_plain_path_reports_usage_when_the_provider_exposes_it():
+    # Final review fix: the eval's off rows need a token baseline.
+    class UsageProvider(FakeProvider):
+        last_usage = {"input_tokens": 700, "output_tokens": 50}
+
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=UsageProvider([json.dumps(VALID_RESULT)]), model="m")
+    assert outcome.usage == {"input_tokens": 700, "output_tokens": 50}
+
+
+def test_investigation_summary_is_optional():
+    data = copy.deepcopy(VALID_RESULT)
+    data["investigation"] = {"steps": []}
+    assert StructuredResult.model_validate(data).investigation.summary == ""

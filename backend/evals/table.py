@@ -31,7 +31,10 @@ def render_table(
     cases: Sequence[Case],
     model_labels: Sequence[str],
     outcomes: Mapping[tuple[str, str], Outcome],
+    notes: Mapping[tuple[str, str], str] | None = None,
 ) -> str:
+    """``notes`` (1.4.0): an extra note per (case, label) row, e.g. the live
+    investigate summary; joined to the unverified note when both apply."""
     # rows: (case, model, serving cell, chain cell, note)
     blocks: list[list[tuple[str, str, str, str, str]]] = []
     for case in cases:
@@ -39,7 +42,10 @@ def render_table(
         rows = [(case.name, "expected", exp_serving, exp_chain, "")]
         for label in model_labels:
             out = outcomes[(case.name, label)]
-            note = f"⚠ {out.unverified} unverified" if out.unverified else ""
+            parts = [f"⚠ {out.unverified} unverified"] if out.unverified else []
+            if notes and notes.get((case.name, label)):
+                parts.append(notes[(case.name, label)])
+            note = " · ".join(parts)
             rows.append(("", label, out.serving_text + _mark(out.serving_ok),
                          out.chain_text + _mark(out.chain_ok), note))
         blocks.append(rows)

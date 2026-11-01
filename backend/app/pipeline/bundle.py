@@ -16,7 +16,7 @@ from __future__ import annotations
 import statistics
 from typing import Any
 
-from app.collectors.http_sampler import is_probe
+from app.collectors.http_sampler import is_investigation, is_probe
 
 
 def assemble_bundle(
@@ -36,7 +36,7 @@ def assemble_bundle(
     T06 (traceroute), T07 (enrichment). Returns a JSON-serializable dict.
     """
     samples = samples or []
-    requests = [s for s in samples if not is_probe(s)]
+    requests = [s for s in samples if not is_probe(s) and not is_investigation(s)]
     merged_traceroute = _merge_traceroute(traceroute, enrichment)
     merged_traceroute["seam"] = seam(merged_traceroute["hops"], samples, dns)
 
@@ -126,12 +126,28 @@ def cache_bust_header_diff(requests: list[dict], probe: dict) -> tuple[list[str]
     return differing, varying
 
 
+def sample_timing_facts(sample: dict, edge_rtt_ms: float | None) -> dict:
+    """One sample's timing row and the exact fact strings the model may cite
+    (1.4.0: shared by the bundle and the investigation tool). Arithmetic only."""
+    ttfb = _ttfb(sample)
+    row: dict = {"request": sample.get("request"), "ttfb_ms": None, "server_ms": None, "facts": []}
+    if ttfb is None:
+        return row
+    row["ttfb_ms"] = _r(ttfb)
+    row["facts"].append(f"request {row['request']} ttfb_ms: {row['ttfb_ms']}")
+    if edge_rtt_ms is not None:
+        row["server_ms"] = _r(ttfb - edge_rtt_ms)
+        row["facts"].append(f"request {row['request']} server_ms: {row['server_ms']}")
+    return row
+
+
 def timing_section(samples: list[dict]) -> dict:
     """Edge round trip, per-request server time and its spread, the cache-bust
-    probe baseline, and the exact fact strings the LLM may cite. Numbers only —
-    what they mean is the prompt's business (§2)."""
-    requests = [s for s in samples if not is_probe(s)]
+    probe baseline, investigation rows (1.4.0), and the exact fact strings the
+    LLM may cite. Numbers only — what they mean is the prompt's business (§2)."""
+    requests = [s for s in samples if not is_probe(s) and not is_investigation(s)]
     probe = next((s for s in samples if is_probe(s)), None)
+    investigations = [s for s in samples if is_investigation(s)]
 
     # Edge RTT = the sampler's bare TCP connect to the peer IP (rtt_ms). Never
     # connect_ms: httpcore's connect span includes DNS resolution, which would
@@ -152,14 +168,11 @@ def timing_section(samples: list[dict]) -> dict:
 
     rows = []
     for sample in requests:
-        ttfb = _ttfb(sample)
-        if ttfb is None:
+        timed = sample_timing_facts(sample, edge_rtt)
+        if timed["ttfb_ms"] is None:
             continue
-        row = {"request": sample.get("request"), "ttfb_ms": _r(ttfb), "server_ms": server(ttfb)}
-        rows.append(row)
-        facts.append(f"request {row['request']} ttfb_ms: {row['ttfb_ms']}")
-        if row["server_ms"] is not None:
-            facts.append(f"request {row['request']} server_ms: {row['server_ms']}")
+        rows.append({k: timed[k] for k in ("request", "ttfb_ms", "server_ms")})
+        facts += timed["facts"]
 
     section: dict = {"edge_rtt_ms": _r(edge_rtt) if edge_rtt is not None else None, "requests": rows}
 
@@ -189,6 +202,16 @@ def timing_section(samples: list[dict]) -> dict:
             facts.append(f"cache_bust differing headers: {', '.join(differing) or 'none'}")
             facts.append(f"warm-varying headers: {', '.join(varying) or 'none'}")
     section["cache_bust"] = cache_bust
+
+    # 1.4.0: requests the model asked for, each with its own row and facts.
+    inv_rows = []
+    for sample in investigations:
+        timed = sample_timing_facts(sample, edge_rtt)
+        if timed["ttfb_ms"] is None:
+            continue
+        inv_rows.append({k: timed[k] for k in ("request", "ttfb_ms", "server_ms")})
+        facts += timed["facts"]
+    section["investigation"] = inv_rows
     section["facts"] = facts
     return section
 
@@ -204,7 +227,7 @@ def seam(hops: list[dict], samples: list[dict], dns: dict | None) -> dict:
         if isinstance(hop, dict) and hop.get("ip") and not hop.get("unresponsive") and not hop.get("private"):
             traced = hop["ip"]
             break
-    peers = sorted({s["peer_ip"] for s in samples if not is_probe(s) and s.get("peer_ip")})
+    peers = sorted({s["peer_ip"] for s in samples if not is_probe(s) and not is_investigation(s) and s.get("peer_ip")})
     records = set()
     if isinstance(dns, dict):
         records = set(dns.get("a") or []) | set(dns.get("aaaa") or [])

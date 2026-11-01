@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from app.collectors.http_sampler import sample_requests
+from app.collectors.http_sampler import is_investigation, is_probe, sample_requests
 from tests.http_test_server import RawHTTPServer, build_response, received_header
 
 
@@ -277,3 +277,13 @@ async def test_live_sampling_real_site():
     assert samples[0]["headers"]
     assert samples[0]["http_version"] in ("HTTP/1.1", "HTTP/2")
     assert json.loads(json.dumps(samples)) == samples
+
+
+def test_is_probe_is_only_the_cache_bust_probe():
+    # 1.4.0: investigation samples are tagged probe="investigation" but are not
+    # "the" cache-bust probe.
+    assert is_probe({"probe": "cache_bust"})
+    assert not is_probe({"probe": "investigation"})
+    assert not is_probe({})
+    assert is_investigation({"probe": "investigation"})
+    assert not is_investigation({"probe": "cache_bust"})

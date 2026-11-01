@@ -19,6 +19,7 @@ export interface AnalysisOptions {
   cache_bust_probe: boolean;
   extra_request_headers: Record<string, string>;
   geo_hint: string | null;
+  investigate?: boolean; // 1.4.0: the model may request the URL again (up to 5 times)
 }
 
 export interface CreateAnalysisBody {

@@ -93,6 +93,22 @@ uv run --env-file ../.env python -m evals run --model anthropic:claude-opus-4-8 
 - Full results (every verdict) go to `backend/evals/runs/<timestamp>.json`
   (git-ignored), including a hash of the system prompt used.
 
+## Investigate mode (1.4.0, experiment)
+
+```bash
+make eval MODELS="anthropic:claude-opus-4-8" INVESTIGATE=1
+```
+
+Every case then runs twice per model: the frozen replay as above, and a row
+labelled `<model> +investigate` where the model may call `request_page` up to
+5 times. **Those rows make live requests to the case's URL** (the one place the
+eval touches a target). Cases store no custom request headers, so the live
+calls carry only the model's; a case captured behind a cookie or User-Agent
+may compare against a different page — leave such cases out (`--case`) or
+recapture them without custom headers. The note column shows `live · N req ·
+T tok`; the results file keeps every tool call (`tool_calls`) and the extra
+samples. Case files are never modified.
+
 ## Scoring rules
 
 - **Serving ✓** — the layer the report would flag as serving (the layer named

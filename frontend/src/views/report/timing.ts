@@ -4,14 +4,25 @@ import type { RawSample } from "./types";
 // (app/pipeline/bundle.py timing_section), so the progression table renders
 // numbers straight from the samples, never from LLM output.
 
+/** The original cache-bust probe (1.4.0: never an investigation request). */
 export function isProbe(s: RawSample): boolean {
-  return !!s.probe;
+  return s.probe === "cache_bust";
 }
 
-export function splitSamples(samples: RawSample[]): { requests: RawSample[]; probe: RawSample | null } {
+/** A request the model asked for in investigate mode (1.4.0). */
+export function isInvestigation(s: RawSample): boolean {
+  return s.probe === "investigation";
+}
+
+export function splitSamples(samples: RawSample[]): {
+  requests: RawSample[];
+  probe: RawSample | null;
+  investigations: RawSample[];
+} {
   return {
-    requests: samples.filter((s) => !isProbe(s)),
+    requests: samples.filter((s) => !isProbe(s) && !isInvestigation(s)),
     probe: samples.find(isProbe) ?? null,
+    investigations: samples.filter(isInvestigation),
   };
 }
 

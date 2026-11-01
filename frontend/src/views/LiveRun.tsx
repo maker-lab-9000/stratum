@@ -13,8 +13,18 @@ import type { Dns, Hop, RawSample } from "./report/types";
 // reconnects) recovers without a stuck spinner. Terminal event → the report.
 type StepStatus = "pending" | "active" | "done" | "failed";
 
+// 1.4.0: the latest investigate-mode tool call, as the backend emitted it.
+interface InvestigateCall {
+  n: number;
+  reason?: string;
+  header_names?: string[];
+  status_code?: number | null;
+  refused?: string | null;
+}
+
 interface LiveState {
   stages: Record<string, StepStatus>;
+  investigate: { last: InvestigateCall | null; count: number | null; seen: boolean };
   dns: Dns | null;
   warm: { warmed?: boolean; skipped?: boolean; error?: string | null; timing?: { duration_ms?: number } | null } | null;
   samples: RawSample[] | null;
@@ -25,6 +35,7 @@ interface LiveState {
 
 const INITIAL: LiveState = {
   stages: { dns: "pending", warm: "pending", sample: "pending", traceroute: "pending", analyze: "pending" },
+  investigate: { last: null, count: null, seen: false },
   dns: null,
   warm: null,
   samples: null,
@@ -57,6 +68,16 @@ function reducer(state: LiveState, action: Action): LiveState {
   if (e.stage === "warm" && data && typeof data === "object") next.warm = data as LiveState["warm"];
   if (e.stage === "sample" && Array.isArray(data)) next.samples = data as RawSample[];
   if (e.stage === "traceroute" && data && typeof data === "object") next.trace = data as LiveState["trace"];
+  if (e.stage === "investigate") {
+    if (e.status === "progress" && data && typeof data === "object") {
+      next.investigate = { ...next.investigate, seen: true, last: data as InvestigateCall };
+    } else if (e.status === "completed") {
+      const count = (data as { count?: number } | undefined)?.count ?? next.investigate.count;
+      // A run with no calls (or a provider without tools) shows no step.
+      const seen = next.investigate.seen || (typeof count === "number" && count > 0);
+      next.investigate = { ...next.investigate, seen, count: typeof count === "number" ? count : null };
+    }
+  }
   if (e.stage === "pipeline" && e.terminal) next.done = true;
   return next;
 }
@@ -127,6 +148,20 @@ function buildSteps(state: LiveState, requestCount: number | null, model: string
     ? `${model ?? "The model"} is reading ${responses} responses…`
     : "";
 
+  // 1.4.0: present only once the model has asked for something. Active while
+  // calls arrive; done when the backend says how many it made.
+  const inv = state.investigate;
+  const invDone = inv.count !== null;
+  const invOut = invDone
+    ? `${inv.count} ${inv.count === 1 ? "request" : "requests"}`
+    : inv.last
+      ? `${inv.last.n} of 5: ${
+          inv.last.refused
+            ? `refused: ${inv.last.refused}`
+            : `${(inv.last.header_names ?? []).join(", ") || "no extra headers"} · ${inv.last.status_code ?? "no response"}`
+        }`
+      : "";
+
   return [
     { id: "dns", name: "Look up DNS", status: state.stages.dns, out: dnsOut },
     { id: "warm", name: "Warm the cache", status: state.stages.warm, out: warmOut },
@@ -134,6 +169,7 @@ function buildSteps(state: LiveState, requestCount: number | null, model: string
     ...(probe ? [{ id: "probe", name: "Force a miss", status: state.stages.sample, out: probeOut }] : []),
     { id: "traceroute", name: "Trace the route", status: state.stages.traceroute, out: traceOut },
     { id: "analyze", name: "Read the evidence", status: state.stages.analyze, out: readOut },
+    ...(inv.seen ? [{ id: "investigate", name: "Investigate", status: (invDone ? "done" : "active") as StepStatus, out: invOut }] : []),
   ];
 }
 

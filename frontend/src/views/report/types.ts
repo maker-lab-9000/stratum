@@ -96,17 +96,64 @@ export interface SampleTiming {
   rtt_ms?: number | null; // bare TCP connect to the peer IP (request 1 only)
 }
 
-// One entry of samples_json. `probe` marks the cache-bust probe (not one of
-// the N requests); `timing`/`peer_ip` are absent on reports before 1.2.0.
+// One entry of samples_json. `probe` is "cache_bust" for the probe or
+// "investigation" (1.4.0) for a request the model asked for; neither is one of
+// the N requests. `timing`/`peer_ip` are absent on reports before 1.2.0.
 export interface RawSample {
   request: number;
+  ok?: boolean;
   http_version?: string;
   status?: number;
   started_at_ms?: number;
   headers: [string, string][];
   probe?: string;
+  investigation?: InvestigationTag;
   peer_ip?: string | null;
   timing?: SampleTiming;
+  error?: string | null;
+}
+
+// 1.4.0: what the model asked for on an investigation sample.
+export interface InvestigationTag {
+  n: number;
+  headers: Record<string, string>;
+  cache_bust: boolean;
+  reason: string;
+}
+
+// 1.4.0: one entry of llm_json.investigation_log, written by the pipeline.
+export interface InvestigationLogEntry {
+  n: number;
+  request: number | null;
+  asked_at_ms: number;
+  answered_at_ms: number | null;
+  model_said: string;
+  // Verbatim model input: usually {headers, cache_bust, reason}, but a refused
+  // call may hold any shape, so render it defensively.
+  input: { headers?: unknown; cache_bust?: unknown; reason?: unknown };
+  sent: { url: string; method: string; headers: [string, string][] } | null;
+  response:
+    | { status?: number | null; http_version?: string | null; peer_ip?: string | null; timing?: SampleTiming; header_count?: number }
+    | { error: string | null }
+    | null;
+  returned: unknown;
+  refused: string | null;
+}
+
+// 1.4.0: the model's own account (llm_json.investigation), or the pipeline's
+// note when the mode was requested but the provider has no tools.
+export interface Investigation {
+  summary?: string;
+  steps?: { request: number; purpose: string; observed: string }[];
+  requested?: boolean;
+  available?: boolean;
+  reason?: string;
+}
+
+export interface Recommendation {
+  action: string;
+  reason: string;
+  confidence?: string | null;
 }
 
 export interface Dns {

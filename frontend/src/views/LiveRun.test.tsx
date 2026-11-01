@@ -179,3 +179,28 @@ test("a header absent on every request reads 'no Age header', never 'Age — →
   expect(step("Force a miss").textContent).toContain("status 200, 274.3 ms to first byte");
   expect(step("Force a miss").textContent).not.toContain("Age");
 });
+
+
+// --- 1.4.0 investigate mode -----------------------------------------------------
+
+test("investigate events add a step that reads the latest call and completes", () => {
+  renderRun(2);
+  expect(screen.queryByText("Investigate")).toBeNull();
+  emit({ stage: "analyze", status: "started" });
+  emit({ stage: "investigate", status: "progress", data: { n: 1, reason: "see the tiers", header_names: ["Fastly-Debug"], status_code: 200, refused: null } });
+  const s1 = step("Investigate");
+  expect(s1).toHaveClass("is-active");
+  expect(s1).toHaveTextContent("1 of 5: Fastly-Debug · 200");
+  emit({ stage: "investigate", status: "progress", data: { n: 2, reason: "r", header_names: [], status_code: null, refused: "budget" } });
+  expect(step("Investigate")).toHaveTextContent("2 of 5: refused: budget");
+  emit({ stage: "investigate", status: "completed", data: { count: 2 } });
+  expect(step("Investigate")).toHaveClass("is-done");
+  expect(step("Investigate")).toHaveTextContent("2 requests");
+});
+
+
+test("a completed investigate event with no calls adds no step", () => {
+  renderRun(2);
+  emit({ stage: "investigate", status: "completed", data: { count: 0 } });
+  expect(screen.queryByText("Investigate")).toBeNull();
+});
