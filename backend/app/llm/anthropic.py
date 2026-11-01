@@ -90,9 +90,10 @@ class AnthropicProvider(LLMProvider):
         call_tool: ToolDispatcher,
         settings: LLMSettings = DEFAULT_SETTINGS,
         max_rounds: int = 8,
+        tool_calls: list[ToolCall] | None = None,
     ) -> ToolRun:
-        transcript = [dict(m) for m in messages]
-        tool_calls: list[ToolCall] = []
+        transcript = messages  # extended in place: a caller can resume after an error
+        tool_calls = tool_calls if tool_calls is not None else []
         usage = {"input_tokens": 0, "output_tokens": 0}
         rounds = 0
         nudged = False

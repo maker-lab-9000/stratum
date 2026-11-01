@@ -177,10 +177,14 @@ class LLMProvider(abc.ABC):
         call_tool: ToolDispatcher,
         settings: LLMSettings = DEFAULT_SETTINGS,
         max_rounds: int = 8,
+        tool_calls: list[ToolCall] | None = None,
     ) -> ToolRun:
         """Run a tool-use conversation from ``messages`` (provider-shaped
-        transcript) until the model answers in text, or ``max_rounds`` assistant
-        turns have passed (then one ``NUDGE`` turn). Returns the text, every tool
-        call made, summed usage and the extended transcript, so the caller can
-        continue the same conversation."""
+        transcript, **extended in place** as turns are made, so a caller holding
+        the list can resume after a provider error) until the model answers in
+        text, or ``max_rounds`` assistant turns have passed (then one ``NUDGE``
+        turn). ``tool_calls``, when given, is extended in place with every call
+        as it is made (same resume reason). Returns the text, every tool call
+        made, summed usage and the transcript, so the caller can continue the
+        same conversation."""
         raise NotImplementedError(f"{self.id} has no tool support")
