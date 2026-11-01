@@ -200,3 +200,105 @@ async def test_openrouter_live_smoke():
         model="anthropic/claude-haiku-4-5",
     )
     assert "OK" in text.upper()
+
+
+# --- 1.4.0: tool-use loop (investigate mode) --------------------------------
+
+from app.llm.base import NUDGE  # noqa: E402
+
+
+def _tool_turn(text: str | None = None, *, tool_id="tu_1", tool_input=None) -> dict:
+    content = []
+    if text:
+        content.append({"type": "text", "text": text})
+    content.append({"type": "tool_use", "id": tool_id, "name": "request_page",
+                    "input": tool_input or {"headers": {"X-Debug": "1"}, "reason": "why"}})
+    return {"content": content, "stop_reason": "tool_use",
+            "usage": {"input_tokens": 100, "output_tokens": 20}}
+
+
+def _end_turn(text: str) -> dict:
+    return {"content": [{"type": "text", "text": text}], "stop_reason": "end_turn",
+            "usage": {"input_tokens": 150, "output_tokens": 30}}
+
+
+def _scripted(*responses):
+    it = iter(responses)
+    return lambda request: httpx.Response(200, json=next(it))
+
+
+@respx.mock
+async def test_tool_loop_executes_tool_and_returns_final_text():
+    route = respx.post(ANTHROPIC_MSGS).mock(side_effect=_scripted(_tool_turn(), _end_turn('{"ok": 1}')))
+    calls = []
+
+    async def call_tool(name, tool_input, model_said):
+        calls.append((name, tool_input, model_said))
+        return {"request": 6, "status": 200}
+
+    provider = AnthropicProvider("sk-ant-test-key")
+    run = await provider.analyze_with_tools(
+        system="SYS", messages=[{"role": "user", "content": "USR"}], model="m",
+        tools=[{"name": "request_page"}], call_tool=call_tool,
+    )
+    assert provider.supports_tools() is True
+    assert run["text"] == '{"ok": 1}' and run["stop_reason"] == "end_turn"
+    assert calls == [("request_page", {"headers": {"X-Debug": "1"}, "reason": "why"}, "")]
+    assert run["tool_calls"] == [{"id": "tu_1", "name": "request_page",
+                                  "input": {"headers": {"X-Debug": "1"}, "reason": "why"},
+                                  "result": {"request": 6, "status": 200}, "model_said": ""}]
+    assert run["usage"] == {"input_tokens": 250, "output_tokens": 50}
+
+    assert route.call_count == 2
+    first = json.loads(route.calls[0].request.content)
+    assert first["tools"] == [{"name": "request_page"}]
+    second = json.loads(route.calls[1].request.content)
+    assert second["messages"][-2] == {"role": "assistant", "content": _tool_turn()["content"]}
+    assert second["messages"][-1] == {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": "tu_1", "content": '{"request": 6, "status": 200}'}]}
+    # The returned transcript is the full conversation so far (user, assistant, tool_result, assistant).
+    assert [m["role"] for m in run["messages"]] == ["user", "assistant", "user", "assistant"]
+
+
+@respx.mock
+async def test_text_and_tool_use_in_one_turn_continues_the_loop():
+    respx.post(ANTHROPIC_MSGS).mock(side_effect=_scripted(
+        _tool_turn("Let me check the debug headers."), _end_turn("{}")))
+    seen = []
+
+    async def call_tool(name, tool_input, model_said):
+        seen.append(model_said)
+        return {}
+
+    run = await AnthropicProvider("k").analyze_with_tools(
+        system="S", messages=[{"role": "user", "content": "U"}], model="m",
+        tools=[{"name": "request_page"}], call_tool=call_tool)
+    assert seen == ["Let me check the debug headers."]
+    assert run["text"] == "{}"
+    assert run["tool_calls"][0]["model_said"] == "Let me check the debug headers."
+
+
+@respx.mock
+async def test_max_rounds_sends_the_nudge():
+    route = respx.post(ANTHROPIC_MSGS).mock(side_effect=_scripted(
+        _tool_turn(tool_id="tu_1"), _tool_turn(tool_id="tu_2"), _end_turn("final")))
+
+    async def call_tool(name, tool_input, model_said):
+        return {}
+
+    run = await AnthropicProvider("k").analyze_with_tools(
+        system="S", messages=[{"role": "user", "content": "U"}], model="m",
+        tools=[{"name": "request_page"}], call_tool=call_tool, max_rounds=2)
+    assert route.call_count == 3
+    third = json.loads(route.calls[2].request.content)
+    assert third["messages"][-1] == {"role": "user", "content": NUDGE}
+    assert third["tools"] == [{"name": "request_page"}]
+    assert run["text"] == "final" and len(run["tool_calls"]) == 2
+
+
+async def test_openrouter_has_no_tool_support():
+    provider = OpenRouterProvider("k")
+    assert provider.supports_tools() is False
+    with pytest.raises(NotImplementedError):
+        await provider.analyze_with_tools(system="S", messages=[], model="m", tools=[],
+                                          call_tool=None)

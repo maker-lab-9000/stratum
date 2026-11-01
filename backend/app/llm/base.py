@@ -15,7 +15,9 @@ Determinism there relies on the model plus the retry-on-invalid-JSON guardrail
 from __future__ import annotations
 
 import abc
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import TypedDict
 
 import httpx
 
@@ -31,6 +33,30 @@ class LLMSettings:
 
 
 DEFAULT_SETTINGS = LLMSettings()
+
+# 1.4.0 — tool use (investigate mode). The loop's final nudge when the model
+# keeps calling tools past max_rounds.
+NUDGE = "No more tool calls are available. Return the JSON object now."
+
+
+class ToolCall(TypedDict):
+    id: str
+    name: str
+    input: dict
+    result: dict
+    model_said: str  # the assistant text in the same turn, verbatim ("" if none)
+
+
+class ToolRun(TypedDict):
+    text: str
+    tool_calls: list[ToolCall]
+    usage: dict  # {"input_tokens": int, "output_tokens": int}, summed over rounds
+    messages: list[dict]  # the full transcript so far, provider-shaped
+    stop_reason: str
+
+
+# call_tool(name, input, model_said) -> the JSON-serializable result handed back.
+ToolDispatcher = Callable[[str, dict, str], Awaitable[dict]]
 
 
 class ProviderError(Exception):
@@ -136,3 +162,25 @@ class LLMProvider(abc.ABC):
         self, *, system: str, user: str, model: str, settings: LLMSettings = DEFAULT_SETTINGS
     ) -> str:
         """Run one completion; return the model's raw text (T12 parses it)."""
+
+    def supports_tools(self) -> bool:
+        """1.4.0: whether ``analyze_with_tools`` is implemented."""
+        return False
+
+    async def analyze_with_tools(
+        self,
+        *,
+        system: str,
+        messages: list[dict],
+        model: str,
+        tools: list[dict],
+        call_tool: ToolDispatcher,
+        settings: LLMSettings = DEFAULT_SETTINGS,
+        max_rounds: int = 8,
+    ) -> ToolRun:
+        """Run a tool-use conversation from ``messages`` (provider-shaped
+        transcript) until the model answers in text, or ``max_rounds`` assistant
+        turns have passed (then one ``NUDGE`` turn). Returns the text, every tool
+        call made, summed usage and the extended transcript, so the caller can
+        continue the same conversation."""
+        raise NotImplementedError(f"{self.id} has no tool support")

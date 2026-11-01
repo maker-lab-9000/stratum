@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import json
+
 from app.llm.base import (
     DEFAULT_SETTINGS,
     DEFAULT_TIMEOUT_S,
+    NUDGE,
     LLMProvider,
     LLMSettings,
+    ToolCall,
+    ToolDispatcher,
+    ToolRun,
     request_json,
 )
 
@@ -67,6 +73,64 @@ class AnthropicProvider(LLMProvider):
             provider=self.id, timeout=self._timeout, json=body,
         )
         return _extract_text(data)
+
+
+    # --- 1.4.0: tool use -----------------------------------------------------
+
+    def supports_tools(self) -> bool:
+        return True
+
+    async def analyze_with_tools(
+        self,
+        *,
+        system: str,
+        messages: list[dict],
+        model: str,
+        tools: list[dict],
+        call_tool: ToolDispatcher,
+        settings: LLMSettings = DEFAULT_SETTINGS,
+        max_rounds: int = 8,
+    ) -> ToolRun:
+        transcript = [dict(m) for m in messages]
+        tool_calls: list[ToolCall] = []
+        usage = {"input_tokens": 0, "output_tokens": 0}
+        rounds = 0
+        nudged = False
+        while True:
+            data = await request_json(
+                "POST", f"{_API}/messages", headers=self._headers(),
+                provider=self.id, timeout=self._timeout,
+                json={"model": model, "max_tokens": settings.max_tokens, "system": system,
+                      "tools": tools, "messages": transcript},
+            )
+            _add_usage(usage, data.get("usage"))
+            content = data.get("content", [])
+            transcript.append({"role": "assistant", "content": content})
+            rounds += 1
+            text = _extract_text(data)
+            uses = [b for b in content if b.get("type") == "tool_use"]
+            if data.get("stop_reason") != "tool_use" or not uses or nudged:
+                return ToolRun(text=text, tool_calls=tool_calls, usage=usage,
+                               messages=transcript, stop_reason=str(data.get("stop_reason")))
+            results = []
+            for block in uses:
+                result = await call_tool(block.get("name", ""), block.get("input") or {}, text)
+                tool_calls.append(ToolCall(id=block.get("id", ""), name=block.get("name", ""),
+                                           input=block.get("input") or {}, result=result,
+                                           model_said=text))
+                results.append({"type": "tool_result", "tool_use_id": block.get("id", ""),
+                                "content": json.dumps(result, ensure_ascii=False)})
+            transcript.append({"role": "user", "content": results})
+            if rounds >= max_rounds:
+                transcript.append({"role": "user", "content": NUDGE})
+                nudged = True
+
+
+def _add_usage(total: dict, usage: dict | None) -> None:
+    for key in ("input_tokens", "output_tokens"):
+        value = (usage or {}).get(key)
+        if isinstance(value, int):
+            total[key] += value
 
 
 def _extract_text(data: dict) -> str:
