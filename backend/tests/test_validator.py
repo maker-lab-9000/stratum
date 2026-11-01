@@ -303,3 +303,26 @@ def test_failed_finding_citation_sets_low_confidence():
     assert any(f.path == "performance_findings[0].evidence_header" for f in result.flags)
     assert result.verdict.performance_findings[0].confidence == "low"
     assert result.verdict.security_findings[0].confidence == "high"
+
+
+
+# --- 1.3.1: the origin layer may cite the cache-bust probe ----------------------
+
+def test_origin_layer_may_cite_probe_headers():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["layers"].append({
+        "layer_name": "Origin", "vendor": "v", "cache_type": "origin", "role": "origin", "caches": False,
+        "state": "UNKNOWN", "evidence_headers": ["x-probe-only: abc123"], "confidence": "medium",
+    })
+    result = validate_verdict(StructuredResult.model_validate(data), _timed_bundle())
+    origin = result.verdict.cache_verdict.layers[-1]
+    assert origin.confidence == "medium"
+    assert not any(f.path == "cache_verdict.layers[2].state" for f in result.flags)
+
+
+def test_non_origin_layer_still_cannot_cite_probe_headers():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["layers"][0]["evidence_headers"] = ["x-probe-only: abc123"]
+    result = validate_verdict(StructuredResult.model_validate(data), _timed_bundle())
+    flag = next(f for f in result.flags if f.path == "cache_verdict.layers[0].state")
+    assert flag.reason == "cited header appears only on the cache-bust probe"

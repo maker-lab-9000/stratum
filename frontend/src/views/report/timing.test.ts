@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { edgeRttMs, isProbe, serverMs, splitSamples } from "./timing";
+import { edgeRttMs, formatServerMs, isProbe, serverMs, splitSamples } from "./timing";
 import type { RawSample, SampleTiming } from "./types";
 
 const timing = (t: Partial<SampleTiming>): SampleTiming => ({
@@ -44,5 +44,14 @@ describe("timing helpers", () => {
     expect(serverMs(sample(2, { timing: timing({ ttfb_ms: null }) }), 38.2)).toBeNull();
     expect(serverMs(sample(2, { timing: timing({ ttfb_ms: 41.4 }) }), null)).toBeNull();
     expect(serverMs(sample(2), 38.2)).toBeNull();
+  });
+
+  test("server time below 1 ms (or negative, from jitter) reads <1 ms", () => {
+    expect(formatServerMs(-1.3)).toBe("<1 ms");
+    expect(formatServerMs(0.5)).toBe("<1 ms");
+    expect(formatServerMs(0)).toBe("<1 ms");
+    expect(formatServerMs(1)).toBe("1 ms");
+    expect(formatServerMs(250)).toBe("250 ms");
+    expect(formatServerMs(null)).toBe("—");
   });
 });

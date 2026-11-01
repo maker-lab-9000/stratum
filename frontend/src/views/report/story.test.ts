@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { bandState, confidenceLevel, headlineFor, layerName, roleLabel, servedPhrase } from "./story";
+import { bandDetail, bandNames, bandState, confidenceLevel, headlineFor, layerName, roleLabel, servedPhrase } from "./story";
 import type { CacheVerdict, Layer } from "./types";
 
 const L = (over: Partial<Layer>): Layer => ({
@@ -92,5 +92,40 @@ describe("story helpers", () => {
     expect(roleLabel("origin")).toBe("Origin");
     expect(roleLabel("unknown")).toBe("Unidentified layer");
     expect(roleLabel("weird")).toBe("Unidentified layer");
+  });
+});
+
+// --- 1.3.1: band names when bands share a vendor; no repeated detail ----------
+
+describe("band names", () => {
+  test("bands that share a vendor are named by the model's layer name", () => {
+    const layers = [
+      L({ layer_name: "Akamai Edge", vendor: "Akamai", role: "edge" }),
+      L({ layer_name: "Akamai Shield", vendor: "Akamai", role: "shield" }),
+      L({ layer_name: "Apache Dispatcher", vendor: "Apache / AEM", role: "reverse_proxy" }),
+    ];
+    expect(bandNames(layers)).toEqual(["Akamai Edge", "Akamai Shield", "Apache / AEM"]);
+  });
+
+  test("vendor matching ignores case and unknown vendors never count as shared", () => {
+    const layers = [
+      L({ layer_name: "WordPress VIP edge cache", vendor: "Automattic" }),
+      L({ layer_name: "WordPress origin", vendor: "automattic ", role: "origin" }),
+      L({ layer_name: "Mystery A", vendor: "unknown" }),
+      L({ layer_name: "Mystery B", vendor: "unknown" }),
+    ];
+    expect(bandNames(layers)).toEqual(["WordPress VIP edge cache", "WordPress origin", "Mystery A", "Mystery B"]);
+  });
+
+  test("detail drops anything the name or an earlier part already says", () => {
+    const edge = L({ layer_name: "Akamai Edge", vendor: "Akamai", cache_type: "CDN edge cache" });
+    expect(bandDetail(edge, "Akamai Edge")).toBe("CDN edge cache");
+    const wp = L({ layer_name: "WordPress VIP edge cache", vendor: "Automattic", cache_type: "edge cache" });
+    expect(bandDetail(wp, "WordPress VIP edge cache")).toBe("Automattic");
+    const varnish = L({ layer_name: "Varnish app cache", vendor: "Varnish", cache_type: "App cache" });
+    expect(bandDetail(varnish, "Varnish")).toBe("Varnish app cache");
+    const dispatcher = L({ layer_name: "Apache Dispatcher", vendor: "Apache / AEM", cache_type: "disk cache" });
+    expect(bandDetail(dispatcher, "Apache / AEM")).toBe("Apache Dispatcher, disk cache");
+    expect(bandDetail(L({ layer_name: "Origin", vendor: "unknown", cache_type: "" }), "Origin")).toBe("");
   });
 });

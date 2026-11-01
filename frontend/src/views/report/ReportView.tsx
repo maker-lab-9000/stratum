@@ -92,7 +92,7 @@ export function ReportView({ report: injected }: ReportViewProps) {
       <Answer report={report} onRerun={onRerun} />
       {showStory && verdict && (
         <>
-          <Strata verdict={verdict} vantage={report.vantage} />
+          <Strata verdict={verdict} vantage={report.vantage} samples={samples} />
           <Claims verdict={verdict} />
         </>
       )}

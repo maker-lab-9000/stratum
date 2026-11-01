@@ -5,9 +5,10 @@ import type { Finding, TimingCheck } from "./types";
 
 // What to look at (1.3.0): security and performance findings as ONE list,
 // severity-sorted (critical → warning → info), each with its category, its
-// cited evidence, and the model's confidence. The timing assessment joins the
-// list (gap → warning, first among warnings; a consistent/insufficient note
-// with a summary → info). Beyond the first 5, "Show all (N)".
+// cited evidence, and the model's confidence. A timing gap joins the list as a
+// warning, first among warnings; a consistent/insufficient assessment does not
+// (1.3.1 — it already reads as the Timing claim row). Beyond the first 5,
+// "Show all (N)".
 const RANK: Record<Finding["severity"], number> = { critical: 0, warning: 1, info: 2 };
 const SEV: Record<Finding["severity"], { cls: string; label: string }> = {
   critical: { cls: "crit", label: "Critical" },
@@ -17,11 +18,10 @@ const SEV: Record<Finding["severity"], { cls: string; label: string }> = {
 const COLLAPSE_AFTER = 5;
 export const TIMING_TITLE = "Timing doesn't match the headers";
 
-/** Severity of the timing row, or null when it renders nothing. */
+/** Severity of the timing row, or null when it renders nothing: only a gap is
+ *  something to look at. */
 export function timingCard(timing: TimingCheck | undefined): Finding["severity"] | null {
-  if (!timing) return null;
-  if (timing.status === "gap") return "warning";
-  return timing.summary ? "info" : null;
+  return timing?.status === "gap" ? "warning" : null;
 }
 
 interface Row {
@@ -54,10 +54,10 @@ function rows(security: Finding[], performance: Finding[], timing?: TimingCheck)
             key: "timing",
             severity: timingSeverity,
             category: "Performance" as const,
-            title: timing.status === "gap" ? TIMING_TITLE : "Timing check",
+            title: TIMING_TITLE,
             description: timing.summary,
             evidence: timing.evidence,
-            confidence: timing.status === "insufficient" ? null : timing.confidence,
+            confidence: timing.confidence,
             absent: false,
           },
         ]

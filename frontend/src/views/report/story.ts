@@ -27,6 +27,42 @@ export function layerName(layer: { vendor?: string; layer_name?: string }): stri
 }
 const nameOf = layerName;
 
+const meaningfulVendor = (layer: { vendor?: string }) => {
+  const v = (layer.vendor ?? "").trim().toLowerCase();
+  return v && v !== "unknown" ? v : null;
+};
+
+/** Band names for the strata (1.3.1): the vendor, unless two or more bands share
+ *  it — then each of those is named by the model's own layer name, so the bands
+ *  stay distinguishable (two layer names, not the same vendor twice). */
+export function bandNames(layers: { vendor?: string; layer_name?: string }[]): string[] {
+  const counts = new Map<string, number>();
+  for (const l of layers) {
+    const v = meaningfulVendor(l);
+    if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  return layers.map((l) => {
+    const v = meaningfulVendor(l);
+    if (v && (counts.get(v) ?? 0) > 1 && l.layer_name) return l.layer_name;
+    return layerName(l);
+  });
+}
+
+/** The quiet line under a band name: layer name, vendor and cache type, minus
+ *  anything the name or an earlier part already says (case-insensitive). */
+export function bandDetail(layer: { vendor?: string; layer_name?: string; cache_type?: string }, name: string): string {
+  const said = [name.toLowerCase()];
+  const parts: string[] = [];
+  for (const raw of [layer.layer_name, layer.vendor, layer.cache_type]) {
+    const part = (raw ?? "").trim();
+    const lower = part.toLowerCase();
+    if (!part || lower === "unknown" || said.some((s) => s.includes(lower))) continue;
+    parts.push(part);
+    said.push(lower);
+  }
+  return parts.join(", ");
+}
+
 /** A few words for lists: "Fastly, behind Amazon CloudFront", "Origin", "No verdict". */
 export function servedPhrase(verdict: CacheVerdict | null, degraded: boolean): string {
   if (degraded || !verdict) return "No verdict";

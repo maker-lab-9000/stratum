@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { historyRows, LONG_MODELS, longReport, mockApi, RUNNING_FRAMES } from "./mocks";
+import { changingHeaderReport, historyRows, LONG_MODELS, longReport, mockApi, RUNNING_FRAMES } from "./mocks";
 
 // Scenario 5: the layout holds at desktop (1280) and mobile (390) — the mockup's
 // two reference widths. A committed pixel baseline is deliberately avoided
@@ -70,3 +70,14 @@ test("launch with a long model list has no horizontal scroll at 390", async ({ p
   await expect(page.locator("#model")).toBeAttached();
   expect(await noHorizontalScroll(page)).toBe(true);
 });
+
+test("a long changing-header value doesn't squeeze the other request columns", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockApi(page, { report: changingHeaderReport() });
+  await page.goto("/reports/changing");
+  const heads = page.locator("table.prog thead th");
+  await expect(heads).toHaveCount(5); // Signal + 4 requests
+  const widths = await heads.evaluateAll((ths) => ths.slice(1).map((th) => th.getBoundingClientRect().width));
+  expect(Math.max(...widths) / Math.min(...widths)).toBeLessThan(1.6);
+});
+

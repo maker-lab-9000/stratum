@@ -95,6 +95,11 @@ table.hops tr.asn-group td { background: var(--panel-2); cursor: pointer; }
 table.hops tr:last-child td, table.layers tr:last-child td, table.prog tr:last-child td { border-bottom: 0; }
 table.prog tbody th { font-family: var(--body); font-size: 13.5px; color: var(--hi); font-weight: 400; width: 170px; text-align: left; }
 table.prog td { font-family: var(--mono); font-size: 12px; color: var(--hi); }
+/* 1.3.1: equal request columns — one long changing-header value wraps in its
+   own cell instead of squeezing the others. */
+table.prog { table-layout: fixed; }
+table.prog thead th:first-child { width: 170px; }
+table.prog td { overflow-wrap: anywhere; }
 
 /* header progression at N>6: per-signal state strip */
 .strip { display: inline-flex; gap: 2px; vertical-align: middle; }
@@ -327,6 +332,7 @@ pre.raw .hk { color: var(--accent); } pre.raw .hv { color: var(--hi); }
 .band-proof { min-width: 0; }
 .band-state { display: block; font-weight: 600; font-size: 14px; }
 .band-proof code { display: block; margin-top: 2px; font-family: var(--mono); font-size: 12.5px; color: var(--mid); overflow-wrap: anywhere; }
+.band-measured { display: block; margin-top: 6px; font-size: 12.5px; color: var(--mid); font-variant-numeric: tabular-nums; }
 .band-rate { display: flex; justify-content: flex-end; }
 .band.served { box-shadow: inset 3px 0 0 var(--hit); }
 .band.served .band-drop::before { bottom: 50%; }

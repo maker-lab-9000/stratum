@@ -99,12 +99,19 @@ function buildSteps(state: LiveState, requestCount: number | null, model: string
         ? `Loaded in a browser${warm.timing?.duration_ms != null ? `, ${(warm.timing.duration_ms / 1000).toFixed(1)} s` : ""}`
         : errorText(warm.error);
 
+  // 1.3.1: an Age header absent on every request says so in words, never "Age — → —".
   const ages = requests.map((s) => header(s, "age"));
-  const reqOut = requests.length
-    ? `status ${requests[0].status ?? "—"}, Age ${ages[0] ?? "—"} → ${ages[ages.length - 1] ?? "—"}`
-    : "";
+  const ageOut = ages.some((a) => a !== null)
+    ? `Age ${ages[0] ?? "—"} → ${ages[ages.length - 1] ?? "—"}`
+    : "no Age header";
+  const reqOut = requests.length ? `status ${requests[0].status ?? "—"}, ${ageOut}` : "";
+  const probeAge = probe ? header(probe, "age") : null;
   const probeOut = probe
-    ? `status ${probe.status ?? "—"}, Age ${header(probe, "age") ?? "—"}, ${probe.timing?.ttfb_ms ?? "—"} ms to first byte`
+    ? [
+        `status ${probe.status ?? "—"}`,
+        ...(probeAge !== null ? [`Age ${probeAge}`] : []),
+        `${probe.timing?.ttfb_ms ?? "—"} ms to first byte`,
+      ].join(", ")
     : "";
 
   const hops = state.trace?.hops ?? [];

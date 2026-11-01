@@ -31,6 +31,15 @@ function seamText(seam: Seam | undefined): string {
   );
 }
 
+// 1.3.1: the edge's location by the model's reading of the response headers
+// (PoP / datacenter tokens) beats GeoIP for anycast addresses. Code compares the
+// two strings only; it never parses a header.
+function locationConflict(headerLocation: string, geoCity: string | null | undefined): boolean {
+  const a = headerLocation.trim().toLowerCase();
+  const b = (geoCity ?? "").trim().toLowerCase();
+  return !!a && !!b && !a.includes(b) && !b.includes(a);
+}
+
 function hostname(url: string): string {
   try {
     return new URL(url).hostname;
@@ -58,6 +67,11 @@ export function Hosted({ report }: { report: Report }) {
   const edge = [...responsive].reverse().find((h) => !h.private && h.ip);
   const peer = splitSamples(samples).requests.find((s) => s.peer_ip)?.peer_ip;
   const answered = peer ?? edge?.ip ?? dns?.a?.[0] ?? null;
+  const edgeLayer = verdict?.layers?.find((l) => l.role !== "client");
+  const headerLocation = (edgeLayer?.location ?? "").trim();
+  const conflict = locationConflict(headerLocation, edge?.city);
+  const rtt = edge?.rtt_ms != null ? `, ${Math.round(edge.rtt_ms)}\u00a0ms` : "";
+  const ending = conflict ? `, ending at ${headerLocation}` : edge?.city ? `, ending in ${edge.city}` : "";
 
   return (
     <section className="hosted">
@@ -87,9 +101,14 @@ export function Hosted({ report }: { report: Report }) {
           <dd>
             {hops.length > 0 ? (
               <>
-                {responsive.length} hops
-                {edge?.city ? `, ending in ${edge.city}` : ""}
-                {edge?.rtt_ms != null ? `, ${edge.rtt_ms} ms` : ""}
+                {`${responsive.length} ${responsive.length === 1 ? "hop" : "hops"}${ending}${rtt}`}
+                {conflict && (
+                  <span className="note">
+                    {" "}
+                    Location from the response headers, by the model's reading. GeoIP says {edge?.city}, which is
+                    often wrong for anycast addresses.
+                  </span>
+                )}
               </>
             ) : (
               <>

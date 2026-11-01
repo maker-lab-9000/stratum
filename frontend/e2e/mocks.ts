@@ -125,6 +125,27 @@ export function longReport(): object {
   };
 }
 
+// 1.3.1: four requests where one changing header carries a long unbroken value
+// on request 1 only (a real hackaday.com shape) — it must not squeeze the other
+// request columns.
+export function changingHeaderReport(): object {
+  const base = akamaiReport as unknown as { samples_json: Record<string, unknown>[] };
+  const sample0 = base.samples_json[0];
+  return {
+    ...akamaiReport,
+    id: "changing",
+    samples_json: [1, 2, 3, 4].map((request) => ({
+      ...sample0,
+      request,
+      timing: { connect_ms: null, tls_ms: null, ttfb_ms: 270.2 + request, total_ms: 300, rtt_ms: request === 1 ? 25.5 : null },
+      headers: [
+        ["x-cache", request === 1 ? "MISS" : "HIT"],
+        ...(request === 1 ? [["set-cookie", `test_cookie=${"WP%20Cookie%20check".repeat(3)}; path=/`]] : []),
+      ],
+    })),
+  };
+}
+
 // ~300 models with one very long name — the launch line must not scroll at 390.
 export const LONG_MODELS = {
   providers: [

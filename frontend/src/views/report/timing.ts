@@ -33,3 +33,10 @@ export function serverMs(s: RawSample, edgeRtt: number | null): number | null {
   if (typeof ttfb !== "number" || edgeRtt === null) return null;
   return round1(ttfb - edgeRtt);
 }
+
+/** Server time for display (1.3.1): below 1 ms — including small negatives from
+ *  RTT jitter — reads "<1 ms". The exact value stays in the bundle facts. */
+export function formatServerMs(v: number | null | undefined): string {
+  if (typeof v !== "number") return "—";
+  return v < 1 ? "<1 ms" : `${v} ms`;
+}

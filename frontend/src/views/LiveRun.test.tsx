@@ -169,3 +169,13 @@ test("singular counts read naturally", () => {
   emit({ stage: "traceroute", status: "completed", data: { hops: [{ n: 1, ip: "10.0.0.1" }] } });
   expect(step("Trace the route").textContent).toContain("1 hop, last 10.0.0.1");
 });
+
+test("a header absent on every request reads 'no Age header', never 'Age — → —'", () => {
+  renderRun(2);
+  const bare = (request: number, extra: Record<string, unknown> = {}) => ({ ...sample(request, 0), headers: [["x-cache", "HIT"]], ...extra });
+  emit({ stage: "sample", status: "completed", data: [bare(1), bare(2), bare(3, { probe: "cache_bust", timing: { connect_ms: null, tls_ms: null, ttfb_ms: 274.3, total_ms: 280, rtt_ms: null } })] });
+  expect(step("Request the page 2×").textContent).toContain("status 200, no Age header");
+  expect(step("Request the page 2×").textContent).not.toContain("—");
+  expect(step("Force a miss").textContent).toContain("status 200, 274.3 ms to first byte");
+  expect(step("Force a miss").textContent).not.toContain("Age");
+});

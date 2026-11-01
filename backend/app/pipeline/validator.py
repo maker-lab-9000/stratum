@@ -26,7 +26,8 @@ Fabricated values still fail: neither their value nor any captured token matches
 
 Timing (1.2.0): the cache-bust probe's headers are excluded from evidence for
 layer / sample / provider / finding claims (the probe is not one of the N
-requests). ``timing_check`` citations are checked against the bundle's
+requests) — except the origin layer (1.3.1), since the probe's response is the
+one that came from the origin. ``timing_check`` citations are checked against the bundle's
 ``timing.facts`` by **exact** match (a separate set, never the loose index, so a
 number that merely appears elsewhere can't pass); its non-timing citations may
 also use the probe's headers. When validation lowers the headline confidence or
@@ -197,7 +198,10 @@ def validate_verdict(result: StructuredResult, bundle: dict) -> ValidationResult
 
     # Layers: any failed (or missing) citation downgrades the layer's state.
     for i, layer in enumerate(cv.layers):
-        failed = [c for c in layer.evidence_headers if not index.contains(c)]
+        # 1.3.1: the cache-bust probe is the one response that came from the
+        # origin, so the origin layer may cite its headers; others may not.
+        layer_index = probe_index if layer.role == "origin" else index
+        failed = [c for c in layer.evidence_headers if not layer_index.contains(c)]
         if failed or not layer.evidence_headers:
             layer.state = "UNKNOWN"
             layer.confidence = "low"

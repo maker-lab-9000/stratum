@@ -44,7 +44,9 @@ served the page is marked; the origin behind it was "not reached".
 
 **What the requests showed** — the model's count of caching layers, who
 delivered the page and whether the timing agrees (each with its own meter),
-then the measured values across the requests: Age, Cache-Control, Via, time to
+then the measured values across the requests: Age, Cache-Control and Via (or
+one "Not sent" line), a row for every header whose value changed between
+requests (a cache status flipping MISS → HIT, a rotating server id), time to
 first byte and time behind the edge, with the cache-bust probe as its own
 column. The model's per-request reading is the one interpreted row.
 

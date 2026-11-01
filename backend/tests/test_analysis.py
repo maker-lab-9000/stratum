@@ -318,8 +318,19 @@ def test_malformed_new_fields_do_not_lose_verdict(field, value, expected):
 
 
 def test_prompt_probe_header_citation_rule():
-    assert "only inside `timing_check`" in SYSTEM_PROMPT
+    assert "only inside `timing_check` and for the origin layer" in SYSTEM_PROMPT
     assert "cite the probe's headers as plain" in SYSTEM_PROMPT
+
+
+def test_prompt_real_data_guidance():
+    for marker in (
+        "PoP or datacenter",                 # location from headers over GeoIP
+        "more reliable than GeoIP",
+        "WordPress VIP",                     # vendor table row
+        "never restate the verdict",         # findings are things to fix or check
+        "Vary",                              # cache-key splits
+    ):
+        assert marker in SYSTEM_PROMPT, marker
 
 
 # --- 1.3.0: story fields + per-claim confidence --------------------------------

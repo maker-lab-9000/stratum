@@ -134,13 +134,14 @@ const GAP: TimingCheck = {
 
 
 
-test("insufficient summary renders as an info row", () => {
+test("only a timing gap becomes a finding (1.3.1: no duplicate of the Timing claim row)", () => {
   const insufficient: TimingCheck = { ...GAP, status: "insufficient", summary: "T", hidden_layer_suspected: false };
   const { container, rerender } = render(<Findings security={[]} performance={[]} timing={insufficient} />);
-  const info = container.querySelector(".finding.info") as HTMLElement;
-  expect(info?.textContent).toContain("T");
-  rerender(<Findings security={[]} performance={[]} timing={{ ...insufficient, summary: "" }} />);
   expect(container.querySelector(".finding")).toBeNull();
+  rerender(<Findings security={[]} performance={[]} timing={{ ...insufficient, status: "consistent" }} />);
+  expect(container.querySelector(".finding")).toBeNull();
+  rerender(<Findings security={[]} performance={[]} timing={GAP} />);
+  expect(container.querySelector(".finding.warn")?.textContent).toContain("Timing doesn't match the headers");
 });
 
 
@@ -286,7 +287,8 @@ test("hosted summary", () => {
   const route = within(hosted).getByText("Route").parentElement as HTMLElement;
   expect(route.textContent).toContain("7 hops");
   expect(route.textContent).toContain("Frankfurt");
-  expect(route.textContent).toContain("6.1 ms");
+  expect(route.textContent).toContain("6\u00a0ms"); // never breaks between number and unit
+  expect(route.textContent).not.toContain("6.1");
   const disclosures = Array.from(hosted.querySelectorAll("details")) as HTMLDetailsElement[];
   expect(disclosures.map((d) => d.querySelector("summary")!.textContent)).toEqual(["Map and hop list", "Raw response headers"]);
   expect(disclosures.every((d) => !d.open)).toBe(true);
@@ -341,4 +343,65 @@ test("bands show the model's layer name and cache type, and the strata state the
   expect(band.textContent).toContain("Apache Dispatcher");
   expect(band.textContent).toContain("disk cache");
   expect(screen.getByText("3 caching layers between you and the origin, by the model's count.")).toBeInTheDocument();
+});
+
+// --- 1.3.1: real-data report improvements ---------------------------------------
+
+test("bands that share a vendor are named by layer, without repeating the cache type", () => {
+  const { container } = renderReport(akamaiReport);
+  const bands = Array.from(container.querySelectorAll(".band")) as HTMLElement[];
+  expect(bands.map((b) => b.querySelector(".band-name")!.textContent)).toEqual([
+    "Akamai Edge",
+    "Akamai Shield",
+    "Apache / AEM",
+    "Adobe AEM",
+  ]);
+  expect(bands[0].querySelector(".band-detail")!.textContent).toBe("CDN edge cache");
+  expect(bands[2].querySelector(".band-detail")!.textContent).toBe("Apache Dispatcher, disk cache");
+});
+
+test("the origin band shows the cache-bust request's time behind the edge", () => {
+  const probe = { ...timedSample(4, true), timing: { connect_ms: null, tls_ms: null, ttfb_ms: 288.2, total_ms: 300, rtt_ms: null } };
+  const { container, unmount } = renderReport(withSamples([timedSample(1), timedSample(2), timedSample(3), probe]));
+  const bands = Array.from(container.querySelectorAll(".band")) as HTMLElement[];
+  const origin = bands[bands.length - 1];
+  expect(origin.querySelector(".band-measured")!.textContent).toBe("Cache-bust request: 250 ms behind the edge");
+  expect(container.querySelectorAll(".band-measured")).toHaveLength(1);
+  unmount();
+
+  const none = renderReport(withSamples([timedSample(1), timedSample(2)]));
+  expect(none.container.querySelector(".band-measured")).toBeNull();
+});
+
+test("hosted route prefers the header location when GeoIP disagrees", () => {
+  const layers = V0.layers.map((l, i) => (i === 0 ? { ...l, location: "hhn1 (Frankfurt-Hahn)" } : l));
+  const hostedRoute = (r: Report) => {
+    const { container, unmount } = renderReport(r);
+    const t = (within(container.querySelector(".hosted") as HTMLElement).getByText("Route").parentElement as HTMLElement).textContent ?? "";
+    unmount();
+    return t;
+  };
+  // The real hackaday.com case: anycast GeoIP put the last hop in San Francisco.
+  const trace = akamaiReport.traceroute_json as { hops: { city: string }[] };
+  const sf = { ...trace, hops: trace.hops.map((h, i) => (i === 6 ? { ...h, city: "San Francisco" } : h)) };
+  const conflict = hostedRoute({ ...withLayers(layers), traceroute_json: sf } as unknown as Report);
+  expect(conflict).toContain("7 hops, ending at hhn1 (Frankfurt-Hahn), 6\u00a0ms");
+  expect(conflict).toContain("GeoIP says San Francisco");
+  // A header location that contains the GeoIP city counts as agreement.
+  expect(hostedRoute(withLayers(layers))).toContain("7 hops, ending in Frankfurt, 6\u00a0ms");
+
+  // Agreeing locations (fixture: "Frankfurt" both ways) keep the plain line.
+  const agree = hostedRoute(akamaiReport);
+  expect(agree).toContain("7 hops, ending in Frankfurt, 6\u00a0ms");
+  expect(agree).not.toContain("GeoIP");
+});
+
+test("hosted route says 1 hop", () => {
+  const one = {
+    ...akamaiReport,
+    traceroute_json: { ...(akamaiReport.traceroute_json as object), hops: [(akamaiReport.traceroute_json as { hops: unknown[] }).hops[6]] },
+  } as unknown as Report;
+  const { container } = renderReport(one);
+  const route = within(container.querySelector(".hosted") as HTMLElement).getByText("Route").parentElement as HTMLElement;
+  expect(route.textContent).toContain("1 hop,");
 });

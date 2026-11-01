@@ -250,3 +250,79 @@ test("raw drawer probe tab", async () => {
   await user.click(screen.getByRole("button", { name: "Cache-bust probe" }));
   expect(screen.getByTestId("raw-body").textContent).toContain("x-probe-only");
 });
+
+// --- 1.3.1: real-data progression rows ------------------------------------------
+
+test("server time under 1 ms reads <1 ms, exact value on hover", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const s = [timed(1, 79.5, { connect: 38.2 }), timed(2, 36.9), timed(3, 38.7)];
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "Server time")).toEqual(["41.3 ms", "<1 ms", "<1 ms"]);
+  const th = Array.from(container.querySelectorAll("tbody th")).find((el) => el.textContent === "Server time")!;
+  const cells = Array.from(th.parentElement!.querySelectorAll("td"));
+  expect(cells[1]).toHaveAttribute("title", "-1.3 ms measured");
+  expect(cells[2]).toHaveAttribute("title", "0.5 ms measured");
+});
+
+test("headers absent on every request fold into one 'Not sent' line", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const s = samples(3, [["cache-control", "max-age=300"]]);
+  const { container, rerender } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "Age")).toEqual([]);
+  expect(rowCells(container, "Via")).toEqual([]);
+  expect(rowCells(container, "Cache-Control")).toEqual(["max-age=300"]);
+  expect(screen.getByText("Not sent: Age, Via.")).toBeInTheDocument();
+
+  // Present on the probe only → the row stays.
+  const probe = { ...timed(4, 300, { probe: true, headers: [["age", "0"]] }) };
+  rerender(<Progression verdict={v} samples={[...s, probe]} />);
+  expect(rowCells(container, "Age")).toEqual(["—", "0"]);
+  expect(screen.getByText("Not sent: Via.")).toBeInTheDocument();
+});
+
+const vary = (request: number, extra: [string, string][], probe = false) => ({
+  ...timed(request, null, { probe, headers: [["date", `Sat, 01 Nov 2026 10:00:0${request} GMT`], ["server", "nginx"], ...extra] }),
+});
+
+test("headers whose value changes between requests get their own rows", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const s = [
+    vary(1, [["x-cache", "MISS"], ["x-served-by", "cache-fra-1"], ["x-request-id", "a1"]]),
+    vary(2, [["x-cache", "HIT"], ["x-served-by", "cache-fra-2"], ["x-request-id", "b2"]]),
+    vary(3, [["x-cache", "HIT"], ["x-served-by", "cache-fra-1"], ["x-request-id", "c3"]]),
+    vary(4, [["X-Cache", "MISS"], ["x-served-by", "cache-fra-2"], ["x-request-id", "d4"]], true),
+  ];
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "x-cache")).toEqual(["MISS", "HIT", "HIT", "MISS"]);
+  expect(rowCells(container, "x-served-by")).toEqual(["cache-fra-1", "cache-fra-2", "cache-fra-1", "cache-fra-2"]);
+  expect(rowCells(container, "x-request-id")).toEqual(["a1", "b2", "c3", "d4"]);
+  // Constant headers and the clock never get a row.
+  expect(rowCells(container, "server")).toEqual([]);
+  expect(rowCells(container, "date")).toEqual([]);
+  // Fewest distinct values first: flips before per-request IDs.
+  const labels = Array.from(container.querySelectorAll("tbody th")).map((th) => th.textContent);
+  expect(labels.indexOf("x-cache")).toBeLessThan(labels.indexOf("x-request-id"));
+  expect(labels.indexOf("x-served-by")).toBeLessThan(labels.indexOf("x-request-id"));
+});
+
+test("a header that only differs on the cache-bust probe gets a row", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const s = [
+    vary(1, [["x-cache", "HIT"]]),
+    vary(2, [["x-cache", "HIT"]]),
+    vary(3, [["x-cache", "BYPASS"], ["set-cookie", "wordpress_test_cookie=WP"]], true),
+  ];
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "x-cache")).toEqual(["HIT", "BYPASS"]);
+  expect(rowCells(container, "set-cookie")).toEqual(["—", "wordpress_test_cookie=WP"]);
+});
+
+test("changing-header rows cap at six; the rest are named in a note", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "HIT" })], "Proxy");
+  const names = ["x-a", "x-b", "x-c", "x-d", "x-e", "x-f", "x-g", "x-h"];
+  const s = [1, 2].map((r) => vary(r, names.map((n) => [n, `${n}-${r}`] as [string, string])));
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  for (const n of names.slice(0, 6)) expect(rowCells(container, n)).toHaveLength(2);
+  expect(rowCells(container, "x-g")).toEqual([]);
+  expect(screen.getByText("Also changed between requests: x-g, x-h.")).toBeInTheDocument();
+});
