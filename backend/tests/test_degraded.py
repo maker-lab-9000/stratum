@@ -9,6 +9,7 @@ Scenarios:
 Done-when: killing the LLM cannot lose evidence or wedge a job in `running`.
 """
 
+import copy
 import dataclasses
 import json
 from pathlib import Path
@@ -178,3 +179,114 @@ async def test_rerun_creates_fresh_report_original_untouched(client, degraded_ap
 
 async def test_rerun_unknown_404(client):
     assert (await client.post("/api/analyses/nope/rerun")).status_code == 404
+
+
+# --- 1.4.0: investigate mode through make_llm_analyze and the pipeline -----------
+
+from app.pipeline.investigate import Investigation  # noqa: E402
+from tests.test_analysis import StubToolProvider  # noqa: E402
+from tests.test_investigate import StubRequests  # noqa: E402
+
+
+def _investigated(payload: dict) -> dict:
+    data = copy.deepcopy(payload)
+    data["investigation"] = {"summary": "Two probes.", "steps": [
+        {"request": 5, "purpose": "see the tiers", "observed": "a debug header appeared"}]}
+    data["recommendations"] = [{"action": "Run from another region", "reason": "anycast", "confidence": "medium"}]
+    return data
+
+
+def _tool_provider(final: dict | str, *, calls=2):
+    turns = [("tool", "request_page", {"headers": {f"X-Probe-{i}": "1"}, "reason": f"step {i}"}, f"said {i}")
+             for i in range(1, calls + 1)]
+    turns.append(("text", final if isinstance(final, str) else json.dumps(final)))
+    return StubToolProvider(turns)
+
+
+def _factory(stub: StubRequests):
+    def make(**kwargs):
+        return Investigation(**kwargs, request_fn=stub)
+    return make
+
+
+def _bundle_with_investigate() -> dict:
+    bundle = copy.deepcopy(BUNDLE)
+    bundle["meta"]["request_options"] = {**bundle["meta"]["request_options"], "investigate": True}
+    return bundle
+
+
+async def test_investigate_option_appends_samples_log_and_persists_through_analyze():
+    stub = StubRequests()
+    provider = _tool_provider(_investigated(VALID_RESULT))
+    events: list[dict] = []
+    analyze = make_llm_analyze(resolver=lambda name: provider, investigation_factory=_factory(stub))
+    out = await analyze(_bundle_with_investigate(), "stubtools", "m", emit=events.append)
+
+    assert out["verdict_json"]["provider"] == "Akamai"
+    assert [s["request"] for s in out["samples"]] == [1, 2, 3, 4, 5, 6]
+    assert out["samples"][4]["probe"] == "investigation"
+    assert out["samples"][4]["investigation"]["headers"] == {"X-Probe-1": "1"}
+    log = out["llm_json"]["investigation_log"]
+    assert len(log) == 2 and log[0]["model_said"] == "said 1" and log[1]["request"] == 6
+    assert out["llm_json"]["usage"] == {"input_tokens": 10, "output_tokens": 5}
+    assert out["llm_json"]["investigation"]["steps"][0]["request"] == 5
+    assert out["verdict_json"]["validation"]["ok"] is True
+    assert [e["data"]["n"] for e in events if e["stage"] == "investigate"] == [1, 2]
+    # The request's base headers came from the analysis options.
+    assert stub.calls[0]["index"] == 5 and stub.calls[0]["url"] == BUNDLE["meta"]["url"]
+
+
+async def test_investigate_off_leaves_analyze_unchanged():
+    provider = FakeProvider([json.dumps(VALID_RESULT)])
+    analyze = make_llm_analyze(resolver=lambda name: provider, investigation_factory=_factory(StubRequests()))
+    out = await analyze(BUNDLE, "fake", "m")
+    assert "samples" not in out
+    assert "investigation_log" not in out["llm_json"]
+    assert "usage" not in out["llm_json"]
+
+
+async def test_investigate_with_provider_without_tools_marks_unavailable():
+    provider = FakeProvider([json.dumps(VALID_RESULT)])
+    analyze = make_llm_analyze(resolver=lambda name: provider, investigation_factory=_factory(StubRequests()))
+    out = await analyze(_bundle_with_investigate(), "fake", "m")
+    assert out["llm_json"]["investigation"] == {
+        "requested": True, "available": False, "reason": "provider 'fake' has no tool support"}
+    assert out["llm_json"]["investigation_log"] == []
+    assert out["samples"] == BUNDLE["samples"]
+
+
+async def test_investigate_parse_failure_still_returns_collected_samples():
+    stub = StubRequests()
+    provider = StubToolProvider([
+        ("tool", "request_page", {"reason": "a"}, ""), ("text", "bad"), ("text", "worse")])
+    analyze = make_llm_analyze(resolver=lambda name: provider, investigation_factory=_factory(stub))
+    out = await analyze(_bundle_with_investigate(), "stubtools", "m")
+    assert out["verdict_json"]["status"] == "unavailable"
+    assert len(out["samples"]) == 5 and out["samples"][4]["probe"] == "investigation"
+    assert out["llm_json"] == {"investigation_log": provider_log(out)}
+
+
+def provider_log(out):
+    return out["llm_json"]["investigation_log"]
+
+
+async def test_pipeline_persists_investigation_samples_and_emits(repo):
+    stub = StubRequests()
+    provider = _tool_provider(_investigated(VALID_RESULT))
+    deps = dataclasses.replace(
+        make_deps(),
+        analyze=make_llm_analyze(resolver=lambda name: provider, investigation_factory=_factory(stub)),
+    )
+    report = repo.create(url=URL, provider="stubtools", model="m")
+    events: list[dict] = []
+    await run_analysis(report.id, URL, {"investigate": True}, repo=repo, emit=events.append, deps=deps,
+                       provider="stubtools", model="m")
+    saved = repo.get(report.id)
+    assert saved.status == "done"
+    assert len(saved.samples_json) == 6 and saved.samples_json[5]["probe"] == "investigation"
+    assert len(saved.llm_json["investigation_log"]) == 2
+    stages = [(e["stage"], e["status"]) for e in events]
+    assert ("investigate", "progress") in stages
+    assert stages.index(("investigate", "completed")) < stages.index(("analyze", "completed"))
+    completed = next(e for e in events if e["stage"] == "investigate" and e["status"] == "completed")
+    assert completed["data"] == {"count": 2}

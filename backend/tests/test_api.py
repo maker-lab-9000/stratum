@@ -282,3 +282,22 @@ async def test_cancel_finished_is_noop(client, api_app, repo):
 async def test_cancel_unknown_404(client):
     resp = await client.post("/api/analyses/nope/cancel")
     assert resp.status_code == 404
+
+
+# --- 1.4.0: investigate option -------------------------------------------------
+
+async def test_create_accepts_investigate_option(client, api_app):
+    captured = []
+    original = api_app.state.manager.submit
+
+    def record(report_id, url, options, **kw):
+        captured.append(options)
+        return original(report_id, url, options, **kw)
+
+    api_app.state.manager.submit = record
+    resp = await client.post("/api/analyses", json=_body(investigate=True))
+    assert resp.status_code == 201
+    assert captured[-1]["investigate"] is True
+    resp = await client.post("/api/analyses", json=_body(request_count=2))
+    assert resp.status_code == 201
+    assert captured[-1]["investigate"] is False

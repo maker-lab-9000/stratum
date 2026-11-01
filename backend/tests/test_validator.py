@@ -346,3 +346,52 @@ def test_discarded_timing_check_clears_probe_reached_origin():
     dropped = validate_verdict(_with_timing(["request 2 server_ms: 412.5"], probe_reached_origin=True),
                                _timed_bundle())
     assert dropped.verdict.cache_verdict.timing_check.probe_reached_origin is None
+
+
+# --- 1.4.0: investigation samples as evidence --------------------------------
+
+def _investigated_bundle() -> dict:
+    bundle = copy.deepcopy(BUNDLE)
+    plain = copy.deepcopy(bundle["samples"][0])
+    plain.update({"request": 5, "probe": "investigation",
+                  "investigation": {"n": 1, "headers": {"X-Debug": "1"}, "cache_bust": False, "reason": "r"},
+                  "headers": plain["headers"] + [["x-inv-only", "debug-tier-a"]]})
+    busted = copy.deepcopy(bundle["samples"][0])
+    busted.update({"request": 6, "probe": "investigation",
+                   "investigation": {"n": 2, "headers": {}, "cache_bust": True, "reason": "r"},
+                   "headers": busted["headers"] + [["x-busted-only", "forced-miss-xyz"]]})
+    bundle["samples"] += [plain, busted]
+    return bundle
+
+
+def test_investigation_sample_headers_are_evidence_unless_cache_bust():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["layers"][0]["evidence_headers"] = ["x-inv-only: debug-tier-a"]
+    result = validate_verdict(StructuredResult.model_validate(data), _investigated_bundle())
+    assert result.verdict.cache_verdict.layers[0].state == "PASS"  # unchanged: full evidence
+    assert not [f for f in result.flags if f.path == "cache_verdict.layers[0].state"]
+
+    data["cache_verdict"]["layers"][0]["evidence_headers"] = ["x-busted-only: forced-miss-xyz"]
+    result = validate_verdict(StructuredResult.model_validate(data), _investigated_bundle())
+    assert result.verdict.cache_verdict.layers[0].state == "UNKNOWN"
+    flag = next(f for f in result.flags if f.path == "cache_verdict.layers[0].state")
+    assert flag.reason == "cited header appears only on the cache-bust probe"
+
+    # The origin layer may cite the cache-busting investigation, like the probe.
+    data["cache_verdict"]["layers"][0]["evidence_headers"] = ["X-Cache: TCP_MISS from a23-fra"]
+    data["cache_verdict"]["layers"][1]["role"] = "origin"
+    data["cache_verdict"]["layers"][1]["evidence_headers"] = ["x-busted-only: forced-miss-xyz"]
+    result = validate_verdict(StructuredResult.model_validate(data), _investigated_bundle())
+    assert result.verdict.cache_verdict.layers[1].state == "HIT"
+
+
+def test_investigation_step_request_must_exist():
+    data = copy.deepcopy(VALID_RESULT)
+    data["investigation"] = {"summary": "s", "steps": [
+        {"request": 5, "purpose": "p", "observed": "o"},
+        {"request": 99, "purpose": "p", "observed": "o"}]}
+    result = validate_verdict(StructuredResult.model_validate(data), _investigated_bundle())
+    flags = [f for f in result.flags if f.path.startswith("investigation.steps")]
+    assert [f.path for f in flags] == ["investigation.steps[1].request"]
+    assert flags[0].citation == "99" and flags[0].reason == "cited request does not exist"
+    assert len(result.verdict.investigation.steps) == 2  # flagged, never dropped
