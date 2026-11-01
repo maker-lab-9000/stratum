@@ -359,3 +359,18 @@ test("an id row stays when one column lacks it or two columns share a value", ()
   expect(rowCells(container, "x-trace")).toEqual(["0123456789abcdef01", "fedcba9876543210ff", "—"]);
   expect(screen.queryByText(/Unique per request/)).toBeNull();
 });
+
+test("a very long changing-header value is clamped, with the full value on hover", () => {
+  const v = verdict([layer({ layer_name: "Proxy", state: "MISS" })], "Proxy");
+  const cookie = `_abck=${"4E163B7FF129ADF23E19699ECB3B2B78~-1~YAAQ".repeat(20)}; Path=/; Secure`;
+  const s = [vary(1, [["set-cookie", cookie]]), vary(2, []), vary(3, [])];
+  const { container } = render(<Progression verdict={v} samples={s} />);
+  expect(rowCells(container, "set-cookie")).toEqual([cookie, "—", "—"]);
+  const clamped = container.querySelector("table.prog td .clamp");
+  expect(clamped).not.toBeNull();
+  expect(clamped).toHaveAttribute("title", cookie);
+  // Short values stay plain text.
+  const short = vary(1, [["x-cache", "HIT"]]);
+  const { container: c2 } = render(<Progression verdict={v} samples={[short, vary(2, [["x-cache", "MISS"]])]} />);
+  expect(c2.querySelector("table.prog td .clamp")).toBeNull();
+});

@@ -24,6 +24,10 @@ import type { CacheVerdict, RawSample, SampleState } from "./types";
 // a cache-bust value equal to every request's spans the probe column too.
 const COLUMN_LIMIT = 6;
 const CHANGED_ROW_LIMIT = 6;
+// A value longer than this (a set-cookie with several cookies, a CSP) is
+// clamped to a few lines in its cell; the full text stays on hover and in the
+// raw drawer. Below it, values render as plain text.
+const CLAMP_AFTER = 120;
 const FIXED_HEADERS = ["age", "cache-control", "via"];
 const SKIP_CHANGED = new Set([...FIXED_HEADERS, "date"]);
 
@@ -44,6 +48,16 @@ function stateTag(state: string): { tone: BadgeTone; text: string } {
 const stripClass = (state: string) => (state === "HIT" ? "h" : state === "UNKNOWN" ? "u" : "m");
 
 const ms = (v: number | null | undefined) => (typeof v === "number" ? `${v} ms` : "—");
+
+// A cell value, verbatim; long ones are clamped (CSS) with the full value as a title.
+const cell = (v: string): ReactNode =>
+  v.length > CLAMP_AFTER ? (
+    <span className="clamp" title={v}>
+      {v}
+    </span>
+  ) : (
+    v
+  );
 
 // A value shaped like a random id: hex once separators are dropped (UUIDs,
 // trace ids). Value shape only — never the header name.
@@ -195,16 +209,16 @@ export function Progression({ verdict, samples }: { verdict: CacheVerdict | null
               <th scope="row">{label}</th>
               {compact || uniform ? (
                 <td colSpan={dataSpan + (probeSame ? 1 : 0)} className={cls}>
-                  {uniform ? shown[0] : shown.join("  →  ")}
+                  {cell(uniform ? shown[0] : shown.join("  →  "))}
                 </td>
               ) : (
                 shown.map((v, i) => (
                   <td key={i} className={cls}>
-                    {v}
+                    {cell(v)}
                   </td>
                 ))
               )}
-              {probe && !probeSame && probeCell(headerValue(probe, header) ?? "—", cls)}
+              {probe && !probeSame && probeCell(cell(headerValue(probe, header) ?? "—"), cls)}
             </TableRow>
           );
         })}

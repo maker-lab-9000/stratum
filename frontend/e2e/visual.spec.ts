@@ -79,5 +79,9 @@ test("a long changing-header value doesn't squeeze the other request columns", a
   await expect(heads).toHaveCount(5); // Signal + 4 requests
   const widths = await heads.evaluateAll((ths) => ths.slice(1).map((th) => th.getBoundingClientRect().width));
   expect(Math.max(...widths) / Math.min(...widths)).toBeLessThan(1.6);
+  // 1.3.3: a ~1 KB value is clamped, so its row stays a few lines tall.
+  const row = page.locator("table.prog tbody tr", { has: page.locator("th", { hasText: "set-cookie" }) });
+  const height = await row.evaluate((tr) => tr.getBoundingClientRect().height);
+  expect(height).toBeLessThan(160);
 });
 

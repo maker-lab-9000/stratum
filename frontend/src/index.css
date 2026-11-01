@@ -100,6 +100,11 @@ table.prog td { font-family: var(--mono); font-size: 12px; color: var(--hi); }
 table.prog { table-layout: fixed; }
 table.prog thead th:first-child { width: 170px; }
 table.prog td { overflow-wrap: anywhere; }
+/* A long value (a multi-cookie set-cookie) is clamped to four lines so one
+   header can't make its row thousands of pixels tall; the full value is on
+   hover and in the raw drawer. Row labels stay at the top of a tall row. */
+table.prog tbody th, table.prog td { vertical-align: top; }
+table.prog .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
 
 /* header progression at N>6: per-signal state strip */
 .strip { display: inline-flex; gap: 2px; vertical-align: middle; }
