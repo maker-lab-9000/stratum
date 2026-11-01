@@ -31,25 +31,31 @@ How it works: the model gets one tool, `request_page`, which fetches the same UR
 
 ## The report
 
-A real analysis of `https://www.kleinanzeigen.de/`, top to bottom.
+A real analysis of `https://www.theguardian.com/europe` with investigate mode on, top to bottom. Fastly strips its hit tokens and resets Age for browsers, so the first batch of evidence could not settle the cache state; the model asked for one more request with `Fastly-Debug: 1` and got its answer.
 
-The verdict in plain words, how sure the model is, and its reasoning laid out the way the request travels: DNS, edge, cache layers, origin.
+The verdict in plain words, how sure the model is, and its reasoning laid out the way the request travels: DNS, edge, cache layers, origin, ending with the confidence sentence.
 
 ![The answer and the reasoning](docs/screenshots/report-01-answer-reasoning.png)
 
-The path from you to the origin drawn as stacked layers, with the headers that prove each one and the measured values side by side across every request.
+The path from you to the origin drawn as stacked layers, with the headers that prove each one, then who delivered the page and whether the timing agrees.
 
-![The cache layers, delivery, timing and measured values](docs/screenshots/report-02-layers-measured.png)
+![The cache layers and the claims](docs/screenshots/report-02-layers.png)
 
-Security and performance findings, sorted by severity, each pointing at the evidence that backs it.
+The measured values side by side across every request: the model's per-request reading, the headers that changed, time to first byte and time behind the edge, with the cache-bust probe as its own column.
 
-![Findings](docs/screenshots/report-03-findings.png)
+![Measured values across the requests](docs/screenshots/report-03-measured.png)
 
-When the model investigated, **What the model tried** lists each extra request it made, why, and what it observed, with the full call one click away, and **Recommendations** names what else could settle the open questions.
+**What the model tried**: each extra request it made, why, and what it observed, with the full call one click away. Here one request with `Fastly-Debug: 1` revealed a two-tier hit (Frankfurt edge over London shield).
+
+![What the model tried](docs/screenshots/report-04-tried.png)
+
+Security and performance findings, sorted by severity, each pointing at the evidence that backs it. **Recommendations** follows when the model's requests left questions open.
+
+![Findings](docs/screenshots/report-05-findings.png)
 
 Where the site actually lives: the vantage, the DNS chain, the server that answered, and the route that got there.
 
-![Where it's hosted](docs/screenshots/report-04-hosted.png)
+![Where it's hosted](docs/screenshots/report-06-hosted.png)
 
 ## Stack
 
