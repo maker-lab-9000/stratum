@@ -18,6 +18,20 @@ function status(entry: InvestigationLogEntry): string {
   return r.status != null ? String(r.status) : "no response";
 }
 
+// The log stores the model's input verbatim, so a refused call may carry
+// anything (a nested object, a list, a number). Render it as text, never as a
+// React child, and never let one bad record blank the report.
+const text = (v: unknown): string => (typeof v === "string" ? v : JSON.stringify(v));
+
+function askedLines(input: InvestigationLogEntry["input"]): string[] {
+  const h: unknown = input?.headers;
+  if (h == null) return [];
+  if (typeof h === "object" && !Array.isArray(h)) {
+    return Object.entries(h as Record<string, unknown>).map(([k, v]) => `${k}: ${text(v)}`);
+  }
+  return [`headers: ${text(h)}`];
+}
+
 function RawHeaders({ headers }: { headers: [string, string][] }) {
   return (
     <pre className="raw">
@@ -51,7 +65,7 @@ export function Tried({
       {investigation?.summary && <p className="lede">{investigation.summary}</p>}
       <ol className="tried-list">
         {log.map((entry) => {
-          const headers = Object.entries(entry.input.headers ?? {});
+          const asked = askedLines(entry.input);
           const sample = sampleFor(entry.request);
           const note = entry.request != null ? observed.get(entry.request) : undefined;
           return (
@@ -62,21 +76,19 @@ export function Tried({
               </div>
               <div className="tried-body">
                 <div className="tried-asked">
-                  {headers.length === 0 && <code>no extra headers</code>}
-                  {headers.map(([k, v]) => (
-                    <code key={k}>
-                      {k}: {v}
-                    </code>
+                  {asked.length === 0 && <code>no extra headers</code>}
+                  {asked.map((line, i) => (
+                    <code key={i}>{line}</code>
                   ))}
-                  {entry.input.cache_bust && <code>+ cache-bust query</code>}
+                  {entry.input?.cache_bust === true && <code>+ cache-bust query</code>}
                 </div>
-                {entry.input.reason && <p className="tried-reason">{entry.input.reason}</p>}
+                {entry.input?.reason != null && <p className="tried-reason">{text(entry.input.reason)}</p>}
                 {note && <p className="tried-observed">{note}</p>}
                 <details className="tried-more">
                   <summary>The full call</summary>
                   {entry.model_said && (
                     <p className="tried-said">
-                      The model said: <q>{entry.model_said}</q>
+                      The model said: <q>{text(entry.model_said)}</q>
                     </p>
                   )}
                   {entry.sent && (

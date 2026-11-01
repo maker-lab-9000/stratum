@@ -389,3 +389,15 @@ def test_sample_timing_facts_shape():
         "facts": ["request 7 ttfb_ms: 41.2", "request 7 server_ms: 21.2"]}
     assert sample_timing_facts(_timed(7, ttfb=41.2), None) == {
         "request": 7, "ttfb_ms": 41.2, "server_ms": None, "facts": ["request 7 ttfb_ms: 41.2"]}
+
+
+
+def test_assemble_bundle_keeps_investigation_samples_out_of_progression_and_seam():
+    inputs = akamai_inputs()
+    inv = _sample(9, 5)
+    inv.update({"probe": "investigation", "peer_ip": "9.9.9.9",
+                "investigation": {"n": 1, "headers": {}, "cache_bust": False, "reason": "r"}})
+    inputs["samples"] = list(inputs["samples"]) + [inv]
+    bundle = assemble_bundle(**inputs)
+    assert 9 not in [None] and len(bundle["progression"]["age_values"]) == len(inputs["samples"]) - 1
+    assert "9.9.9.9" not in bundle["traceroute"]["seam"]["peer_ips"]

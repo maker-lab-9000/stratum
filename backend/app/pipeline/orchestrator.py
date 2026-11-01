@@ -153,7 +153,7 @@ async def run_analysis(
             updates["samples_json"] = verdict["samples"]
             llm = verdict.get("llm_json") or {}
             emit({"stage": "investigate", "status": "completed",
-                  "data": {"count": len(llm.get("investigation_log") or [])}})
+                  "data": {"count": sum(1 for e in (llm.get("investigation_log") or []) if not e.get("refused"))}})
         emit({"stage": "analyze", "status": "degraded" if degraded else "completed", "data": verdict["verdict_json"]})
 
         repo.update(report_id, **updates)

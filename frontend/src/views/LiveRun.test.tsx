@@ -197,3 +197,10 @@ test("investigate events add a step that reads the latest call and completes", (
   expect(step("Investigate")).toHaveClass("is-done");
   expect(step("Investigate")).toHaveTextContent("2 requests");
 });
+
+
+test("a completed investigate event with no calls adds no step", () => {
+  renderRun(2);
+  emit({ stage: "investigate", status: "completed", data: { count: 0 } });
+  expect(screen.queryByText("Investigate")).toBeNull();
+});

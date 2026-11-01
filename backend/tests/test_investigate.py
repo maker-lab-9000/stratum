@@ -69,8 +69,9 @@ async def test_call_records_sample_log_and_event():
     assert entry["n"] == 1 and entry["request"] == 6 and entry["refused"] is None
     assert entry["model_said"] == "Let me check the debug headers."
     assert entry["input"] == {"headers": {"Fastly-Debug": "1"}, "reason": "see the tiers"}
+    # Operator base-header values are redacted in the record; the model's stay.
     assert entry["sent"] == {"url": URL, "method": "GET",
-                             "headers": [["X-Base", "1"], ["Fastly-Debug", "1"]]}
+                             "headers": [["X-Base", "<from analysis options>"], ["Fastly-Debug", "1"]]}
     assert entry["response"]["status"] == 200 and entry["response"]["header_count"] == 2
     assert entry["response"]["peer_ip"] == "23.55.1.1"
     assert entry["returned"] == result
@@ -155,7 +156,7 @@ async def test_header_names_preserve_case_in_sent():
     stub = StubRequests()
     inv, _ = _inv(stub)
     await inv.call({"headers": {"fastly-DEBUG": "1"}, "reason": "r"})
-    assert inv.log[0]["sent"]["headers"] == [["X-Base", "1"], ["fastly-DEBUG", "1"]]
+    assert inv.log[0]["sent"]["headers"] == [["X-Base", "<from analysis options>"], ["fastly-DEBUG", "1"]]
 
 
 async def test_model_header_overrides_base_header_by_name_case_insensitively():
@@ -172,3 +173,44 @@ def test_tool_schema_shape():
     assert TOOL_SCHEMA["input_schema"]["required"] == ["reason"]
     assert props["headers"]["additionalProperties"] == {"type": "string"}
     assert "5" in TOOL_SCHEMA["description"]
+
+
+
+# --- final review fixes ----------------------------------------------------------
+
+async def test_non_ascii_header_value_is_refused_not_raised():
+    stub = StubRequests()
+    inv, _ = _inv(stub)
+    result = await inv.call({"headers": {"Accept-Language": "fr\u2011FR"}, "reason": "r"})
+    assert "error" in result and stub.calls == []
+    assert inv.log[0]["refused"].startswith("header_policy:")
+
+
+async def test_request_fn_exception_becomes_a_failed_sample():
+    async def boom(client, url, index, headers, start_ref):
+        raise UnicodeEncodeError("ascii", "x", 0, 1, "boom")
+
+    inv, _ = _inv(boom)
+    result = await inv.call({"headers": {}, "reason": "r"})
+    assert result["sample"]["ok"] is False and "UnicodeEncodeError" in result["sample"]["error"]
+    assert len(inv.samples) == 1 and inv.log[0]["response"]["error"].startswith("UnicodeEncodeError")
+
+
+async def test_events_and_tags_use_the_call_number_consistently():
+    stub = StubRequests()
+    inv, events = _inv(stub)
+    await inv.call({"headers": {"Host": "x"}, "reason": "refused first"})  # call 1, refused
+    await inv.call({"headers": {}, "reason": "made"})  # call 2, request made
+    assert [e["data"]["n"] for e in events] == [1, 2]
+    assert inv.samples[0]["investigation"]["n"] == 2 == inv.log[1]["n"]
+    assert inv.made == 1
+
+
+async def test_sent_redacts_operator_base_header_values_but_keeps_model_values():
+    stub = StubRequests()
+    inv, _ = _inv(stub, base_headers={"Cookie": "session=secret", "User-Agent": "stratum"})
+    await inv.call({"headers": {"User-Agent": "Mozilla/5.0", "X-Debug": "1"}, "reason": "r"})
+    # The wire request carries the real values…
+    assert stub.calls[0]["headers"] == {"Cookie": "session=secret", "User-Agent": "Mozilla/5.0", "X-Debug": "1"}
+    # …the persisted record keeps the operator's values out (names stay), the model's in.
+    assert inv.log[0]["sent"]["headers"] == [["Cookie", "<from analysis options>"], ["User-Agent", "Mozilla/5.0"], ["X-Debug", "1"]]

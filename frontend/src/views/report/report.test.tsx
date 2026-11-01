@@ -525,3 +525,23 @@ test("unavailable note when the provider had no tools", () => {
   expect(screen.getByText("Investigate mode was requested, but openrouter has no tool support.")).toBeInTheDocument();
   expect(screen.queryByText("What the model tried")).toBeNull();
 });
+
+
+test("a refused call with malformed headers still renders (nested object, list, non-string reason)", () => {
+  const llm = { ...(investigatedReport.llm_json as Record<string, unknown>) };
+  const bad = [
+    { n: 1, request: null, asked_at_ms: 1, answered_at_ms: 2, model_said: "", sent: null, response: null,
+      input: { headers: { "Cache-Control": { "no-cache": true } }, reason: 42 },
+      returned: { error: "request refused: headers must be an object of header name to string value" },
+      refused: "header_policy: headers must be an object of header name to string value" },
+    { n: 2, request: null, asked_at_ms: 3, answered_at_ms: 4, model_said: "", sent: null, response: null,
+      input: { headers: ["a"], reason: "list" }, returned: { error: "x" }, refused: "header_policy: x" },
+  ];
+  llm["investigation_log"] = bad;
+  const { container } = renderReport({ ...investigatedReport, llm_json: llm } as Report);
+  const rows = Array.from(container.querySelectorAll(".tried-row"));
+  expect(rows).toHaveLength(2);
+  expect(rows[0]).toHaveTextContent('Cache-Control: {"no-cache":true}');
+  expect(rows[0]).toHaveTextContent("42");
+  expect(rows[1]).toHaveTextContent('headers: ["a"]');
+});

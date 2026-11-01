@@ -128,7 +128,9 @@ export interface InvestigationLogEntry {
   asked_at_ms: number;
   answered_at_ms: number | null;
   model_said: string;
-  input: { headers?: Record<string, string>; cache_bust?: boolean; reason?: string };
+  // Verbatim model input: usually {headers, cache_bust, reason}, but a refused
+  // call may hold any shape, so render it defensively.
+  input: { headers?: unknown; cache_bust?: unknown; reason?: unknown };
   sent: { url: string; method: string; headers: [string, string][] } | null;
   response:
     | { status?: number | null; http_version?: string | null; peer_ip?: string | null; timing?: SampleTiming; header_count?: number }

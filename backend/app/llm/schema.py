@@ -183,7 +183,7 @@ class InvestigationStep(BaseModel):
 
 
 class Investigation(BaseModel):
-    summary: str
+    summary: str = ""
     steps: list[InvestigationStep] = []
 
 

@@ -790,3 +790,21 @@ def test_cli_investigate_flag_parses(tmp_path):
                 is_configured=lambda p: True, cases_dir=_cli_cases(tmp_path), runs_dir=tmp_path / "runs")
     assert code == 0
     assert seen == [False, True]
+
+
+
+@respx.mock
+async def test_capture_strips_investigation_samples(tmp_path):
+    inv = {**GOLDEN["samples"][0], "request": 9, "probe": "investigation",
+           "investigation": {"n": 1, "headers": {"X-Debug": "1"}, "cache_bust": False, "reason": "r"}}
+    respx.get(_API).mock(return_value=httpx.Response(200, json=make_report(samples_json=[*GOLDEN["samples"], inv])))
+    path = await capture("http://localhost:8000/reports/r1", "golden", directory=tmp_path, env={}, now=_NOW)
+    data = json.loads(path.read_text())
+    assert data["evidence"]["samples"] == GOLDEN["samples"]
+
+
+def test_row_note_for_both_modes():
+    from evals.runner import row_note
+    assert row_note({"investigate": False, "tokens": {"input": 8000, "output": 100}, "duration_ms": 8200}) == "frozen · 8.1k tok · 8 s"
+    assert row_note({"investigate": True, "extra_requests": 2, "tokens": {"input": 12000, "output": 400}, "duration_ms": 31400}) == "live · 2 req · 12.4k tok · 31 s"
+    assert row_note({"investigate": False, "tokens": None, "duration_ms": 1400}) == "frozen · tokens n/a · 1 s"

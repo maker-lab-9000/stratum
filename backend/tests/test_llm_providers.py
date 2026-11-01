@@ -302,3 +302,12 @@ async def test_openrouter_has_no_tool_support():
     with pytest.raises(NotImplementedError):
         await provider.analyze_with_tools(system="S", messages=[], model="m", tools=[],
                                           call_tool=None)
+
+
+@respx.mock
+async def test_anthropic_plain_analyze_records_last_usage():
+    respx.post(ANTHROPIC_MSGS).mock(return_value=httpx.Response(200, json={
+        "content": [{"type": "text", "text": "{}"}], "usage": {"input_tokens": 321, "output_tokens": 12}}))
+    provider = AnthropicProvider("k")
+    await provider.analyze(system="S", user="U", model="m")
+    assert provider.last_usage == {"input_tokens": 321, "output_tokens": 12}

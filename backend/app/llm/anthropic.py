@@ -33,6 +33,8 @@ class AnthropicProvider(LLMProvider):
     def __init__(self, api_key: str, *, timeout: float = DEFAULT_TIMEOUT_S) -> None:
         self._key = api_key
         self._timeout = timeout
+        # 1.4.0: token usage of the last plain analyze() call (the eval's baseline).
+        self.last_usage: dict | None = None
 
     def _headers(self) -> dict:
         return {
@@ -72,6 +74,9 @@ class AnthropicProvider(LLMProvider):
             "POST", f"{_API}/messages", headers=self._headers(),
             provider=self.id, timeout=self._timeout, json=body,
         )
+        usage = {"input_tokens": 0, "output_tokens": 0}
+        _add_usage(usage, data.get("usage"))
+        self.last_usage = usage
         return _extract_text(data)
 
 

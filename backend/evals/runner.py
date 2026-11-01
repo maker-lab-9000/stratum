@@ -152,12 +152,20 @@ def _tokens(llm_json: dict | None) -> dict | None:
     return {"input": int(usage.get("input_tokens") or 0), "output": int(usage.get("output_tokens") or 0)}
 
 
-def live_note(record: dict) -> str:
-    """The table note for an investigate row: ``live · 2 req · 12.4k tok``."""
+def row_note(record: dict) -> str:
+    """The table note for any row: ``frozen · 12.4k tok · 8 s`` for an off row,
+    ``live · 2 req · 12.4k tok · 31 s`` for an investigate row (final review:
+    the cost delta the experiment measures must be readable for both)."""
     tokens = record.get("tokens") or {}
     total = tokens.get("input", 0) + tokens.get("output", 0)
     tok = f"{total / 1000:.1f}k tok" if total else "tokens n/a"
-    return f"live · {record.get('extra_requests', 0)} req · {tok}"
+    secs = f"{round((record.get('duration_ms') or 0) / 1000)} s"
+    if record.get("investigate"):
+        return f"live · {record.get('extra_requests', 0)} req · {tok} · {secs}"
+    return f"frozen · {tok} · {secs}"
+
+
+live_note = row_note  # kept for callers of the earlier name
 
 
 def write_results(

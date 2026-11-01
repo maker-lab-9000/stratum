@@ -162,7 +162,9 @@ async def run_analysis_outcome(
                 max_attempts=max_call_attempts, max_total_s=max_backoff_total_s, sleep=sleep,
             )
             try:
-                return AnalysisOutcome(result=parse_structured_result(last_raw))
+                usage = getattr(provider, "last_usage", None)
+                return AnalysisOutcome(result=parse_structured_result(last_raw),
+                                       usage=dict(usage) if isinstance(usage, dict) else {})
             except (json.JSONDecodeError, ValidationError) as exc:
                 last_error = exc
         raise AnalysisParseError(
@@ -193,13 +195,25 @@ async def run_analysis_outcome(
         if prefilled:
             # The correction, then an assistant turn prefilled with "{": the
             # model can only continue the JSON object, so a code fence (the
-            # failure seen live) cannot recur. Strictness is unchanged.
-            state["messages"] = [*state["messages"],
+            # failure seen live on haiku) cannot recur. Strictness is unchanged.
+            # Opus 4.8 / Sonnet 5 reject prefill with a 400 (final review): on
+            # that, drop the prefill and send the plain correction instead.
+            base_messages = list(state["messages"])
+            state["messages"] = [*base_messages,
                                  {"role": "user", "content": _RETRY_CORRECTION},
                                  {"role": "assistant", "content": _PREFILL}]
-        last_raw = await _with_backoff(
-            one_round, max_attempts=max_call_attempts, max_total_s=max_backoff_total_s, sleep=sleep,
-        )
+        try:
+            last_raw = await _with_backoff(
+                one_round, max_attempts=max_call_attempts, max_total_s=max_backoff_total_s, sleep=sleep,
+            )
+        except ProviderError as exc:
+            if not (prefilled and exc.kind == "invalid_request"):
+                raise
+            prefilled = False
+            state["messages"] = [*base_messages, {"role": "user", "content": _RETRY_CORRECTION}]
+            last_raw = await _with_backoff(
+                one_round, max_attempts=max_call_attempts, max_total_s=max_backoff_total_s, sleep=sleep,
+            )
         if prefilled:
             last_raw = _PREFILL + last_raw
         try:

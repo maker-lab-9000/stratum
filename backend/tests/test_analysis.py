@@ -625,3 +625,44 @@ async def test_run_analysis_keeps_returning_a_structured_result():
     provider = FakeProvider([json.dumps(VALID_RESULT)])
     result = await run_analysis(AKAMAI_BUNDLE, provider=provider, model="m")
     assert isinstance(result, StructuredResult)
+
+
+async def test_prefill_rejected_by_model_falls_back_to_plain_correction():
+    # Final review fix: Opus 4.8 / Sonnet 5 return 400 on assistant prefill.
+    class NoPrefill(StubToolProvider):
+        async def analyze_with_tools(self, *, messages, **kw):
+            if messages and messages[-1].get("role") == "assistant":
+                self.received.append([dict(m) for m in messages])
+                raise ProviderError("This model does not support assistant message prefill",
+                                    provider="stubtools", retryable=False, kind="invalid_request", status_code=400)
+            return await super().analyze_with_tools(messages=messages, **kw)
+
+    provider = NoPrefill([
+        ("tool", "request_page", {"reason": "a"}, ""),
+        ("text", "```json\n{}\n```"),
+        ("text", json.dumps(VALID_RESULT)),
+    ])
+    _, call_tool = _tool_sink()
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=provider, model="m", tools=TOOLS, call_tool=call_tool)
+    assert outcome.result.cache_verdict.provider == "Akamai"
+    # Three calls: the first round, the rejected prefilled retry, the plain retry
+    # whose transcript ends with the correction as a user turn.
+    assert len(provider.received) == 3
+    assert provider.received[2][-1]["role"] == "user"
+    assert provider.received[2][-1]["content"].startswith("Your previous response was not valid JSON")
+    assert len(outcome.tool_calls) == 1
+
+
+async def test_plain_path_reports_usage_when_the_provider_exposes_it():
+    # Final review fix: the eval's off rows need a token baseline.
+    class UsageProvider(FakeProvider):
+        last_usage = {"input_tokens": 700, "output_tokens": 50}
+
+    outcome = await run_analysis_outcome(AKAMAI_BUNDLE, provider=UsageProvider([json.dumps(VALID_RESULT)]), model="m")
+    assert outcome.usage == {"input_tokens": 700, "output_tokens": 50}
+
+
+def test_investigation_summary_is_optional():
+    data = copy.deepcopy(VALID_RESULT)
+    data["investigation"] = {"steps": []}
+    assert StructuredResult.model_validate(data).investigation.summary == ""

@@ -66,6 +66,14 @@ TOOL_SCHEMA: dict = {
 }
 
 RequestFn = Callable[..., Awaitable[dict]]
+REDACTED = "<from analysis options>"
+
+
+def _failed_sample(index: int, url: str, exc: Exception) -> dict:
+    return {"request": index, "ok": False, "status": None, "http_version": None, "url": url,
+            "headers": [], "elapsed_ms": 0.0, "started_at_ms": None,
+            "error": f"{type(exc).__name__}: {exc}", "peer_ip": None,
+            "timing": {"connect_ms": None, "tls_ms": None, "ttfb_ms": None, "total_ms": None, "rtt_ms": None}}
 
 
 class Investigation:
@@ -96,10 +104,10 @@ class Investigation:
         self.samples: list[dict] = []
         self.log: list[dict] = []
         self._calls = 0  # tool calls seen, refused ones included
-        self._made = 0  # requests actually sent
+        self.made = 0  # requests actually sent
 
     def remaining(self) -> int:
-        return BUDGET - self._made
+        return BUDGET - self.made
 
     async def aclose(self) -> None:
         if self._client is not None:
@@ -133,7 +141,7 @@ class Investigation:
         if policy_error is not None:
             return self._refuse(entry, f"header_policy: {policy_error}", reason,
                                 {"error": f"request refused: {policy_error}"})
-        if self._made >= BUDGET:
+        if self.made >= BUDGET:
             return self._refuse(
                 entry, "budget", reason,
                 {"error": f"budget exhausted: {BUDGET} investigation requests were made; "
@@ -145,20 +153,29 @@ class Investigation:
         url = cache_bust_url(self._url) if cache_bust else self._url
         index = self._next_request
         self._next_request += 1
-        self._made += 1
+        self.made += 1
 
         logger.info("investigate %d: request %d, headers %s%s", self._calls, index,
                     sorted(model_headers), ", cache-bust" if cache_bust else "")
-        sample = await self._request(self._client_or_open(), url, index, merged, self._start_ref)
+        try:
+            sample = await self._request(self._client_or_open(), url, index, merged, self._start_ref)
+        except Exception as exc:  # noqa: BLE001 — a request that cannot be built is a failed sample, never a crash
+            sample = _failed_sample(index, url, exc)
         sample["probe"] = INVESTIGATION_MARKER
-        sample["investigation"] = {"n": self._made, "headers": model_headers,
+        # n is the call number (refusals included), the same number the log and
+        # the live view use for this call.
+        sample["investigation"] = {"n": self._calls, "headers": model_headers,
                                    "cache_bust": cache_bust, "reason": reason}
         self.samples.append(sample)
 
         result = {"request": index, "sample": sample,
                   "timing": sample_timing_facts(sample, self._edge_rtt)}
         entry["request"] = index
-        entry["sent"] = {"url": url, "method": "GET", "headers": [[k, v] for k, v in merged.items()]}
+        # The persisted record keeps the operator's own header values out (a
+        # staging cookie or token from the analysis options was never stored
+        # before); names stay, and the model's values are verbatim.
+        entry["sent"] = {"url": url, "method": "GET",
+                         "headers": [[k, v if k in model_headers else REDACTED] for k, v in merged.items()]}
         entry["response"] = (
             {"error": sample.get("error")} if not sample.get("ok") else {
                 "status": sample.get("status"), "http_version": sample.get("http_version"),
@@ -168,7 +185,7 @@ class Investigation:
         )
         entry["returned"] = result
         entry["answered_at_ms"] = int(self._clock() * 1000)
-        self._emit_event(self._made, reason, sorted(model_headers), sample.get("status"), None)
+        self._emit_event(self._calls, reason, sorted(model_headers), sample.get("status"), None)
         return result
 
     # -- helpers --------------------------------------------------------------
@@ -210,6 +227,8 @@ def _header_policy_error(headers) -> str | None:
             return f"invalid header name {name!r}"
         if "\r" in value or "\n" in value:
             return f"header {name!r} value must not contain CR or LF"
+        if not all(32 <= ord(ch) < 127 or ch == "\t" for ch in value):
+            return f"header {name!r} value must be printable ASCII"
         if name.lower() in REFUSED_HEADERS:
             return f"header {name!r} cannot be set"
     return None

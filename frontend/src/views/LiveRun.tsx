@@ -73,7 +73,9 @@ function reducer(state: LiveState, action: Action): LiveState {
       next.investigate = { ...next.investigate, seen: true, last: data as InvestigateCall };
     } else if (e.status === "completed") {
       const count = (data as { count?: number } | undefined)?.count ?? next.investigate.count;
-      next.investigate = { ...next.investigate, seen: true, count: typeof count === "number" ? count : null };
+      // A run with no calls (or a provider without tools) shows no step.
+      const seen = next.investigate.seen || (typeof count === "number" && count > 0);
+      next.investigate = { ...next.investigate, seen, count: typeof count === "number" ? count : null };
     }
   }
   if (e.stage === "pipeline" && e.terminal) next.done = true;

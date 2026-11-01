@@ -97,6 +97,8 @@ def make_llm_analyze(
                     "retry later or use a paid model (free-tier models have low daily caps)"
                 ))
             return extra(_degraded(f"{exc.kind} error from provider '{exc.provider}'"))
+        except Exception as exc:  # noqa: BLE001 — never lose collected evidence (§2 #5)
+            return extra(_degraded(f"{type(exc).__name__}: {exc}"))
         finally:
             if inv is not None:
                 await inv.aclose()

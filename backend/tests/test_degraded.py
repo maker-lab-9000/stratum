@@ -290,3 +290,18 @@ async def test_pipeline_persists_investigation_samples_and_emits(repo):
     assert stages.index(("investigate", "completed")) < stages.index(("analyze", "completed"))
     completed = next(e for e in events if e["stage"] == "investigate" and e["status"] == "completed")
     assert completed["data"] == {"count": 2}
+
+
+
+async def test_unexpected_exception_in_investigate_mode_keeps_collected_samples():
+    # Final review fix: anything escaping the loop still degrades with evidence.
+    class Exploding(StubToolProvider):
+        async def analyze_with_tools(self, *, call_tool, **kw):
+            await call_tool("request_page", {"reason": "a"}, "")
+            raise RuntimeError("unexpected")
+
+    stub = StubRequests()
+    analyze = make_llm_analyze(resolver=lambda name: Exploding([]), investigation_factory=_factory(stub))
+    out = await analyze(_bundle_with_investigate(), "stubtools", "m")
+    assert out["verdict_json"]["status"] == "unavailable" and "RuntimeError" in out["verdict_json"]["reason"]
+    assert len(out["samples"]) == 5 and len(out["llm_json"]["investigation_log"]) == 1

@@ -36,7 +36,7 @@ def assemble_bundle(
     T06 (traceroute), T07 (enrichment). Returns a JSON-serializable dict.
     """
     samples = samples or []
-    requests = [s for s in samples if not is_probe(s)]
+    requests = [s for s in samples if not is_probe(s) and not is_investigation(s)]
     merged_traceroute = _merge_traceroute(traceroute, enrichment)
     merged_traceroute["seam"] = seam(merged_traceroute["hops"], samples, dns)
 
@@ -227,7 +227,7 @@ def seam(hops: list[dict], samples: list[dict], dns: dict | None) -> dict:
         if isinstance(hop, dict) and hop.get("ip") and not hop.get("unresponsive") and not hop.get("private"):
             traced = hop["ip"]
             break
-    peers = sorted({s["peer_ip"] for s in samples if not is_probe(s) and s.get("peer_ip")})
+    peers = sorted({s["peer_ip"] for s in samples if not is_probe(s) and not is_investigation(s) and s.get("peer_ip")})
     records = set()
     if isinstance(dns, dict):
         records = set(dns.get("a") or []) | set(dns.get("aaaa") or [])

@@ -21,7 +21,7 @@ from evals.runner import (
     RUNS_DIR,
     Analyze,
     SetupError,
-    live_note,
+    row_note,
     parse_model_spec,
     run_eval,
     write_results,
@@ -86,11 +86,10 @@ def main(
             investigate=args.investigate,
         ))
         labels = [m.label for m in models]
-        notes = {}
         if args.investigate:
             labels = [lab for m in models for lab in (m.label, m.label + INVESTIGATE_SUFFIX)]
-            notes = {(r["case"], r["model"] + INVESTIGATE_SUFFIX): live_note(r)
-                     for r in run.records if r["investigate"]}
+        notes = {(r["case"], r["model"] + (INVESTIGATE_SUFFIX if r["investigate"] else "")): row_note(r)
+                 for r in run.records}
         print(render_table(cases, labels, run.outcomes, notes=notes))
         print(f"results: {write_results(run, models, runs_dir, now=started)}")
         return 0
