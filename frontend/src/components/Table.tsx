@@ -20,12 +20,22 @@ interface TableProps {
   variant: TableVariant;
   head?: ReactNode[];
   className?: string;
+  label?: string;
   children: ReactNode;
 }
 
-export function Table({ variant, head, className, children }: TableProps) {
+// Accessible names for the scroll region per variant (overridable via `label`).
+const DEFAULT_LABEL: Record<TableVariant, string> = {
+  hops: "Traceroute hops",
+  layers: "Cache layers",
+  prog: "Measured values per request",
+};
+
+export function Table({ variant, head, className, label, children }: TableProps) {
+  // The wrapper scrolls sideways on narrow screens, so it is a focusable,
+  // labelled region — keyboard users can scroll it (axe scrollable-region-focusable).
   return (
-    <div className="tbl-wrap">
+    <div className="tbl-wrap" tabIndex={0} role="region" aria-label={label ?? DEFAULT_LABEL[variant]}>
       <table className={className ? `${variant} ${className}` : variant}>
         {head && (
           <thead>

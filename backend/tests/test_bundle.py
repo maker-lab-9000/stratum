@@ -11,6 +11,8 @@ Scenarios:
 import json
 from pathlib import Path
 
+import pytest
+
 from app.pipeline.bundle import assemble_bundle
 
 GOLDEN = Path(__file__).parent / "fixtures" / "bundle" / "golden_bundle.json"
@@ -200,3 +202,120 @@ def test_dns_failure_recorded_as_gap():
 def test_no_gaps_on_healthy_inputs():
     bundle = assemble_bundle(**akamai_inputs())
     assert bundle["meta"]["gaps"] == []
+
+
+# --- 1.2.0: timing corroboration ----------------------------------------------
+
+from app.pipeline.bundle import seam, timing_section  # noqa: E402
+
+
+def _timed(request, *, ttfb, connect=None, rtt=None, status=200, probe=False, peer="23.55.1.1", started=None):
+    sample = _sample(request, 0, status=status)
+    sample["peer_ip"] = peer
+    sample["timing"] = {"connect_ms": connect, "tls_ms": None, "ttfb_ms": ttfb, "total_ms": ttfb,
+                        "rtt_ms": rtt}
+    if started is not None:
+        sample["started_at_ms"] = started
+    if probe:
+        sample["probe"] = "cache_bust"
+    return sample
+
+
+def test_timing_section_arithmetic():
+    samples = [
+        _timed(1, ttfb=79.5, connect=95.0, rtt=38.2),
+        _timed(2, ttfb=41.4),
+        _timed(3, ttfb=42.0),
+        _timed(4, ttfb=450.7, probe=True),
+    ]
+    timing = timing_section(samples)
+    assert timing["edge_rtt_ms"] == 38.2
+    assert timing["requests"] == [
+        {"request": 1, "ttfb_ms": 79.5, "server_ms": 41.3},
+        {"request": 2, "ttfb_ms": 41.4, "server_ms": 3.2},
+        {"request": 3, "ttfb_ms": 42.0, "server_ms": 3.8},
+    ]
+    assert timing["server_ms_spread"] == {"min": 3.2, "median": 3.5, "max": 3.8, "count": 2}
+    assert timing["cache_bust"] == {"ttfb_ms": 450.7, "server_ms": 412.5, "status": 200}
+    assert timing["facts"] == [
+        "edge_rtt_ms: 38.2",
+        "request 1 ttfb_ms: 79.5", "request 1 server_ms: 41.3",
+        "request 2 ttfb_ms: 41.4", "request 2 server_ms: 3.2",
+        "request 3 ttfb_ms: 42.0", "request 3 server_ms: 3.8",
+        "warm server_ms min: 3.2", "warm server_ms median: 3.5", "warm server_ms max: 3.8",
+        "cache_bust ttfb_ms: 450.7", "cache_bust server_ms: 412.5", "cache_bust status: 200",
+    ]
+
+
+def test_bundle_without_timing_fields():
+    bundle = assemble_bundle(**akamai_inputs())
+    assert bundle["timing"] == {"edge_rtt_ms": None, "requests": [], "cache_bust": None, "facts": []}
+
+
+def test_spread_omitted_with_one_warm_value():
+    timing = timing_section([_timed(1, ttfb=79.5, rtt=38.2), _timed(2, ttfb=41.4)])
+    assert "server_ms_spread" not in timing
+    assert not any(f.startswith("warm ") for f in timing["facts"])
+
+
+def test_wall_deltas():
+    inputs = akamai_inputs()
+    inputs["samples"] = [_timed(1, ttfb=1.0, started=0.0), _timed(2, ttfb=1.0, started=1500.0),
+                         _timed(3, ttfb=1.0, started=3010.0)]
+    assert assemble_bundle(**inputs)["progression"]["wall_deltas_s"] == [1.5, 1.5]
+    inputs["samples"][1]["started_at_ms"] = None
+    assert assemble_bundle(**inputs)["progression"]["wall_deltas_s"] == [None, None]
+
+
+def test_probe_excluded_from_progression_and_success_check():
+    inputs = akamai_inputs()
+    inputs["samples"] = [_sample(1, 0), _sample(2, 5), _timed(3, ttfb=400.0, status=403, probe=True)]
+    bundle = assemble_bundle(**inputs)
+    assert bundle["progression"]["age_values"] == [0, 5]
+    assert bundle["progression"]["status"] == [200, 200]
+    inputs["samples"] = [_sample(1, 0, ok=False), _timed(2, ttfb=400.0, probe=True)]
+    assert any(g["stage"] == "samples" for g in assemble_bundle(**inputs)["meta"]["gaps"])
+
+
+_EDGE = {"n": 2, "ip": "23.55.1.1", "private": False, "unresponsive": False}
+_DNS = {"a": ["23.55.1.1", "23.55.1.2"], "aaaa": []}
+
+
+@pytest.mark.parametrize("hops,peers,dns,status", [
+    ([_EDGE], ["23.55.1.1"], _DNS, "confirmed"),
+    ([_EDGE], ["23.55.1.2"], _DNS, "different_edge"),
+    ([{**_EDGE, "ip": "10.9.9.9"}], ["23.55.1.2"], _DNS, "unconfirmed"),
+    ([], ["23.55.1.1"], _DNS, "unconfirmed"),
+    ([_EDGE], [], _DNS, "unconfirmed"),
+])
+def test_seam_states(hops, peers, dns, status):
+    samples = [_timed(i + 1, ttfb=1.0, peer=p) for i, p in enumerate(peers)]
+    samples.append(_timed(9, ttfb=1.0, peer="198.51.100.7", probe=True))  # probe never counts
+    result = seam(hops, samples, dns)
+    assert result["status"] == status
+    assert result["peer_ips"] == sorted(set(peers))
+    assert result["traced_ip"] == (hops[0]["ip"] if hops else None)
+
+
+def test_seam_stored_in_traceroute_and_different_edge_gap():
+    inputs = akamai_inputs()
+    inputs["dns"]["a"] = ["23.55.1.1", "23.55.1.2"]
+    inputs["samples"] = [_timed(1, ttfb=1.0, peer="23.55.1.2")]
+    bundle = assemble_bundle(**inputs)
+    assert bundle["traceroute"]["seam"]["status"] == "different_edge"
+    gap = next(g for g in bundle["meta"]["gaps"] if g["stage"] == "seam")
+    assert "23.55.1.1" in gap["reason"] and "23.55.1.2" in gap["reason"]
+    inputs["samples"] = [_timed(1, ttfb=1.0, peer="23.55.1.1")]
+    assert not any(g["stage"] == "seam" for g in assemble_bundle(**inputs)["meta"]["gaps"])
+
+
+def test_edge_rtt_ignores_connect_span_with_dns():
+    """Final review fix: connect_ms includes DNS resolution; edge RTT comes only
+    from the bare TCP rtt_ms (no fallback — a biased RTT invents false gaps)."""
+    timing = timing_section([_timed(1, ttfb=50.0, connect=87.5, rtt=7.5), _timed(2, ttfb=9.0)])
+    assert timing["edge_rtt_ms"] == 7.5
+    assert timing["requests"][0]["server_ms"] == 42.5
+    no_rtt = timing_section([_timed(1, ttfb=50.0, connect=87.5), _timed(2, ttfb=9.0)])
+    assert no_rtt["edge_rtt_ms"] is None
+    assert all(r["server_ms"] is None for r in no_rtt["requests"])
+

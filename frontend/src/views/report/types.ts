@@ -8,6 +8,8 @@ export interface Layer {
   caches: boolean;
   state: string;
   evidence_headers: string[];
+  confidence?: string | null; // 1.3.0 per-claim confidence (absent on older reports)
+  location?: string;
 }
 
 export interface SampleState {
@@ -22,6 +24,15 @@ export interface ValidationFlag {
   reason: string;
 }
 
+// 1.2.0 — the LLM's reading of HTTP timing against the header story.
+export interface TimingCheck {
+  status: "consistent" | "gap" | "insufficient";
+  summary: string;
+  hidden_layer_suspected: boolean;
+  confidence: string;
+  evidence: string[];
+}
+
 export interface CacheVerdict {
   cached: boolean;
   confidence: string;
@@ -32,6 +43,11 @@ export interface CacheVerdict {
   layers: Layer[];
   sample_states: SampleState[];
   validation?: { ok: boolean; flags: ValidationFlag[] };
+  confidence_reason?: string; // 1.2.0; absent on older reports
+  headline?: string; // 1.3.0
+  headline_detail?: string; // 1.3.0
+  provider_confidence?: string | null; // 1.3.0
+  timing_check?: TimingCheck; // 1.2.0; absent on older reports
   status?: string; // "unavailable" when degraded
   reason?: string;
 }
@@ -48,6 +64,7 @@ export interface Finding {
   title: string;
   description: string;
   evidence_header: string;
+  confidence?: string | null; // 1.3.0
 }
 
 export interface Hop {
@@ -61,6 +78,34 @@ export interface Hop {
   private: boolean;
   unresponsive: boolean;
   hint: string | null;
+}
+
+// Route vs samples: did the traceroute end at the IP the samples connected to?
+export interface Seam {
+  status: "confirmed" | "different_edge" | "unconfirmed";
+  traced_ip: string | null;
+  peer_ips: string[];
+}
+
+export interface SampleTiming {
+  connect_ms: number | null;
+  tls_ms: number | null;
+  ttfb_ms: number | null;
+  total_ms: number | null;
+  rtt_ms?: number | null; // bare TCP connect to the peer IP (request 1 only)
+}
+
+// One entry of samples_json. `probe` marks the cache-bust probe (not one of
+// the N requests); `timing`/`peer_ip` are absent on reports before 1.2.0.
+export interface RawSample {
+  request: number;
+  http_version?: string;
+  status?: number;
+  started_at_ms?: number;
+  headers: [string, string][];
+  probe?: string;
+  peer_ip?: string | null;
+  timing?: SampleTiming;
 }
 
 export interface Dns {

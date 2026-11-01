@@ -35,7 +35,7 @@ from app.collectors.enrichment import (
     NullGeoProvider,
     enrich_hops,
 )
-from app.collectors.http_sampler import sample_requests
+from app.collectors.http_sampler import is_probe, sample_requests
 from app.collectors.traceroute import run_traceroute
 from app.collectors.warmer import warm_cache
 from app.config import default_interval_ms, default_request_count
@@ -82,6 +82,7 @@ def default_deps(
             interval_ms=options.get("interval_ms", default_interval_ms()),
             extra_request_headers=options.get("extra_request_headers"),
             timeout_ms=sample_timeout_ms,
+            cache_bust_probe=options.get("cache_bust_probe", True),
         )
 
     async def _traceroute(url: str) -> dict:
@@ -218,4 +219,5 @@ async def _analyze(bundle: dict, analyze, provider: str | None, model: str | Non
 
 
 def _no_successful_samples(samples: list[dict]) -> bool:
-    return not samples or all(not s.get("ok") for s in samples)
+    requests = [s for s in samples or [] if not is_probe(s)]
+    return not requests or all(not s.get("ok") for s in requests)

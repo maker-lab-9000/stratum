@@ -40,7 +40,9 @@ export function classifyLayers(verdict: CacheVerdict): Classification {
     let kind: LayerKind;
     if (index === servingIndex) {
       // The serving node wins regardless of anything else.
-      kind = layer.role === "origin" ? "served-origin" : "served";
+      // Green "served" means served FROM CACHE: a not-cached verdict is always
+      // the blue origin-serve treatment, whatever role the serving layer has.
+      kind = layer.role === "origin" || !verdict.cached ? "served-origin" : "served";
     } else if (servingIndex >= 0 && index > servingIndex) {
       // Beyond the boundary the layer is never contacted — "not reached" even if
       // its own state came back UNKNOWN (we couldn't observe what we never hit).

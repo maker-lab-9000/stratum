@@ -15,46 +15,54 @@ requirements spec for the full contract.
 
 ## Start here
 
-Point it at a URL, pick a provider + model (fetched live from the provider),
-and optionally tune the request count, interval, cache warm-up, geo hint, and
-custom request headers.
+Paste a URL and press **Analyze**. The model that reads the evidence is one
+quiet line underneath (models are fetched live from the provider); request
+count, interval, warm-up, the cache-bust probe, geo hint and custom headers sit
+under **More options**. Recent analyses, with the model's confidence, are one
+click away.
 
-![Launch form](docs/screenshots/launch.png)
+![Launch](docs/screenshots/launch.png)
+
+While it runs, each step fills in with what it measured: DNS, the browser
+warm-up, the sampled requests, the forced miss, the route, and finally the
+model reading the evidence. Raw headers are one click away; **Cancel** stops
+the run and keeps the report.
+
+![Live run](docs/screenshots/live-run.png)
 
 ## The report
 
-A single report, top to bottom (real analysis of `https://www.berlin.de/` —
-served from an *unidentified* shared cache with no CDN vendor headers, so the
-verdict is honestly hedged at low confidence rather than guessed).
+A real analysis of `https://hackaday.com/` (WordPress VIP), top to bottom.
 
-**Verdict + network route** — the headline verdict tiles (cached, CDN cache,
-serving layer, hosting), DNS resolution, and the computed route geography
-plotting the transit PoPs.
+**The answer and the layers** — the verdict in plain words with the model's
+confidence as a signal meter, then the request's path drawn as stacked layers
+from you to the origin: each layer's role, the headers that prove its state,
+the model's own name for it, and its confidence in that layer. The layer that
+served the page is marked; the origin behind it was "not reached".
 
-![Verdict tiles, DNS and route geography](docs/screenshots/report-01-verdict-route.png)
+![The answer and the cache layers](docs/screenshots/report-01-answer-strata.png)
 
-**Hop ladder** — the enriched TCP-traceroute hops (IP, rDNS, ASN/org, city, RTT
-bars), with private runs dimmed, timeouts as `* * *`, and same-ASN runs
-collapsed into one expandable row.
+**What the requests showed** — the model's count of caching layers, who
+delivered the page and whether the timing agrees (each with its own meter),
+then the measured values across the requests: Age, Cache-Control and Via (or
+one "Not sent" line), a row for every header whose value changed between
+requests (a cache status flipping MISS → HIT, a rotating server id), time to
+first byte and time behind the edge, with the cache-bust probe as its own
+column. The model's per-request reading is the one interpreted row.
 
-![Enriched traceroute hop ladder](docs/screenshots/report-02-hop-ladder.png)
+![Delivery, timing and measured values](docs/screenshots/report-02-measured.png)
 
-**Segment narration + serving layer** — the three route segments (access →
-transit → origin) up to the measurement seam, then the serving-layer topology
-chain with the serving node flagged and everything past the boundary dimmed.
+**What to look at** — security and performance findings as one
+severity-sorted list, each with its cited evidence and the model's confidence.
 
-![Segment narration, measurement seam and serving-layer topology](docs/screenshots/report-03-segments-topology.png)
+![Findings](docs/screenshots/report-03-findings.png)
 
-**Layer breakdown + header progression** — the per-layer table and how the cache
-signals evolve across the N samples.
+**Where it's hosted** — the vantage, DNS, the server that answered and the
+route summary, with the DNS panel, route map, hop list, route narration and raw
+response headers folded underneath. Every claim is the model's, and every cited
+piece of evidence is machine-checked against the captured data.
 
-![Layer-by-layer breakdown and header progression](docs/screenshots/report-04-layers-progression.png)
-
-**Findings** — severity-sorted security and performance findings, each with its
-cited evidence header, plus the raw-headers drawer. Every claim is the LLM's,
-cited from response headers the backend machine-checked.
-
-![Security and performance findings](docs/screenshots/report-05-findings.png)
+![Where it's hosted, with the map and hop list open](docs/screenshots/report-04-hosted.png)
 
 ## Stack
 

@@ -13,6 +13,7 @@ class AnalysisOptions(BaseModel):
     request_count: int = Field(default=4, ge=1, le=20)
     interval_ms: int = Field(default=0, ge=0, le=60_000)
     warm: bool = True
+    cache_bust_probe: bool = True
     extra_request_headers: dict[str, str] = Field(default_factory=dict)
     geo_hint: str | None = None
 

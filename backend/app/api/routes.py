@@ -130,6 +130,24 @@ async def delete_analysis(report_id: str, request: Request) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post("/analyses/{report_id}/cancel")
+async def cancel_analysis(report_id: str, request: Request) -> dict:
+    """Stop a running/queued analysis but keep the report (1.3.0).
+
+    The report ends as ``error`` / "cancelled" and the row is kept (unlike
+    DELETE). Evidence survives only if collection had already finished (it is
+    persisted before the model runs); cancelling mid-collection keeps none of
+    the in-flight DNS / sample / traceroute results. Cancelling a finished
+    report is a no-op."""
+    repo = request.app.state.repo
+    manager = request.app.state.manager
+    if repo.get(report_id) is None:
+        raise HTTPException(status_code=404, detail="report not found")
+    if manager.cancel(report_id):
+        await manager.wait(report_id)
+    return {"id": report_id, "status": repo.get(report_id).status}
+
+
 @router.get("/analyses/{report_id}/stream")
 async def stream_analysis(report_id: str, request: Request) -> StreamingResponse:
     repo = request.app.state.repo

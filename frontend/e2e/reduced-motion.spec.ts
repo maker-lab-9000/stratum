@@ -6,7 +6,7 @@ import { mockApi, RUNNING_FRAMES } from "./mocks";
 // live-run stepper's active step pulses; under reduce its computed
 // animation-name must be "none" (the global reduced-motion rule), and animated
 // with motion allowed (control).
-const activeDot = ".stp.is-active .stp-dot";
+const activeDot = ".step.is-active .step-mark";
 
 async function animationName(page: import("@playwright/test").Page, selector: string) {
   return page.$eval(selector, (el) => getComputedStyle(el).animationName);
@@ -25,5 +25,5 @@ test("with motion allowed the stepper pulse is active (control)", async ({ page 
   await mockApi(page, { streamFrames: RUNNING_FRAMES });
   await page.goto("/runs/rep-e2e");
   await expect(page.locator(activeDot)).toBeVisible();
-  expect(await animationName(page, activeDot)).toBe("stp-pulse");
+  expect(await animationName(page, activeDot)).toBe("step-pulse");
 });

@@ -20,6 +20,7 @@ VENDOR_TABLE = """\
 | Apache dispatcher (AEM) | `Server: Apache`, `X-Dispatcher`, `Server-Timing: dispatcher;desc=…` | `Server-Timing` dispatcher token, `X-Cache-Info` |
 | nginx proxy_cache | `X-Cache-Status` | `X-Cache-Status` (`HIT`/`MISS`) |
 | Fastly/Varnish (behind another CDN) | leaked `x-served-by: cache-*`, `x-timer` (`VS`/`VE`), `X-Varnish` | non-zero `Age` (its own `x-cache` may be overwritten by the outer CDN) |
+| WordPress VIP / WordPress.com (Automattic) | `x-powered-by: WordPress VIP`, `x-rq` (first token is the datacenter, e.g. `hhn1`), `link: <…/wp-json/>; rel="https://api.w.org/"` (WordPress REST API), `host-header`, NS `*.wordpress.com` | `x-cache` (`HIT`/`MISS`/`BYPASS`/`STALE`); no `Age` header is sent |
 | Generic / unidentified | non-zero `Age`, `Cache-Control`, `Via` hop count | **non-zero `Age` = a shared cache stored & served it, even under an edge MISS**; `Age` progression, `Via` chain |"""
 
 # --- §5.2 output schema (shown so the model matches it exactly) ---
@@ -39,13 +40,26 @@ OUTPUT_SCHEMA = """\
         "role": "client|edge|shield|security|load_balancer|reverse_proxy|app_cache|origin|unknown",
         "caches": true,
         "state": "HIT|MISS|PASS|UNKNOWN",
-        "evidence_headers": ["string"] }
+        "evidence_headers": ["string"],
+        "confidence": "high|medium|low",
+        "location": "string" }
     ],
     "sample_states": [
       { "request": 1,
         "state": "HIT|MISS|PASS|UNKNOWN",
         "evidence_headers": ["string"] }
-    ]
+    ],
+    "confidence_reason": "string",
+    "headline": "string",
+    "headline_detail": "string",
+    "provider_confidence": "high|medium|low",
+    "timing_check": {
+      "status": "consistent|gap|insufficient",
+      "summary": "string",
+      "hidden_layer_suspected": false,
+      "confidence": "high|medium|low",
+      "evidence": ["string"]
+    }
   },
   "overall_summary": "string",
   "segment_narration": [
@@ -58,13 +72,15 @@ OUTPUT_SCHEMA = """\
     { "severity": "critical|warning|info",
       "title": "string",
       "description": "string",
-      "evidence_header": "string" }
+      "evidence_header": "string",
+      "confidence": "high|medium|low" }
   ],
   "performance_findings": [
     { "severity": "critical|warning|info",
       "title": "string",
       "description": "string",
-      "evidence_header": "string" }
+      "evidence_header": "string",
+      "confidence": "high|medium|low" }
   ]
 }"""
 
@@ -130,6 +146,46 @@ values. Interpret them:
 - Age flat at 0 with short/`no-cache` Cache-Control → that layer is NOT storing (e.g. CDN bypass — the classic flat-Age finding).
 - Age **non-zero** while the outer edge reports MISS/PASS → the edge is a passthrough and a cache **behind it** served the object; the served-from layer is that downstream cache, not the edge. (Age flat but non-zero across closely-spaced requests is normal for a warm shared cache, not a bypass.)
 - Hit/miss transition between request 1 (cold) and later requests → warm-up behaviour.
+
+## Timing corroboration
+
+The bundle's `timing` section holds HTTP-level measurements, independent of the
+headers. `edge_rtt_ms` is one round trip to the IP that answered (a bare TCP
+connect, measured without DNS). Per request, `server_ms` = time to first byte minus that round trip
+≈ time spent behind the edge. `server_ms_spread` (the "warm server_ms" facts)
+is the spread across the warm requests on the reused connection — treat it as
+measurement noise. `cache_bust` is one extra request with a random query
+parameter (marked `"probe": "cache_bust"` in `samples`); its `server_ms` is the
+cost of a full trip to the origin. The probe is not one of the N requests: never
+give it a `sample_states` entry or use its headers for layer/sample claims.
+
+How to read it (guidance, not fixed thresholds):
+- A hit at the outermost edge typically shows server time of a few ms.
+- Each cache tier behind the edge adds roughly one inter-tier round trip — small
+  when the tiers share a metro, larger across regions.
+- A full miss adds origin generation time; compare against the cache_bust
+  baseline. Check the probe's own response headers first: if the cache ignored
+  the query string (it reports a hit or a non-zero Age), the probe is not a full
+  origin trip and the baseline is unusable.
+
+Fill `timing_check`:
+- `gap` — timing contradicts the header story by an amount that clearly exceeds the warm spread. Examples: the headers say an inner tier or the origin served, but server time is at edge-hit speed and far below the cache_bust baseline (set `hidden_layer_suspected: true` — a cache closer than the one the headers name may be serving); or the headers say the edge HIT but server time is close to the cache_bust baseline. Lower `confidence` accordingly and say why in `confidence_reason`.
+- `consistent` — timing fits the header story, or the difference is inside the noise. If the tiers are plausibly too close to tell apart (e.g. same metro), say so in `summary` rather than suspecting a hidden layer.
+- `insufficient` — timing can't be trusted: no timing facts, the probe failed or was blocked or returned non-2xx, or the samples are block pages or redirects.
+- `evidence` must include the timing facts you rely on, copied verbatim from `timing.facts`; it may also cite headers — cite the probe's headers as plain `name: value` (e.g. `age: 0`), not with a label in front.
+- Headers that appear only on the cache-bust probe may be cited only inside `timing_check` and for the origin layer (`role: origin`) — never for other layers, sample states, the provider, or findings. When the probe bypassed or missed the caches, its response came from the origin: use it to characterise the origin (platform, its own no-cache policy, cookies it sets).
+- `confidence` in `timing_check` is your confidence in the timing assessment itself; `confidence_reason` explains the overall `cache_verdict.confidence` in one sentence (empty if high and uncontested).
+- Timing never adds, removes, or re-states layers and never changes `serving_layer`. Layer, sample, provider and finding citations stay header, DNS and ASN evidence. Never infer cache layers from traceroute hops.
+
+## Story fields and confidence
+
+- Always list the origin as the last layer (`role: origin`); when a cache served the page, its state is `UNKNOWN` (it was not reached). Cite the header that hints at it, or the strongest header you have for the response.
+- `headline`: one short sentence (at most 70 characters) naming the layer that served the page (or saying nothing is cached). It must not contradict `cached` or `serving_layer`.
+- `headline_detail`: one short sentence of context, at most 100 characters, e.g. what the outer layer did. Keep the full reasoning for `overall_summary`.
+- Each `confidence` rates exactly one claim: a layer's identification and state, the provider (`provider_confidence`), or a finding. Prefer `low` or `UNKNOWN` to guessing.
+- `location`: a city or PoP for a layer, only when a captured header value or hop names it; otherwise an empty string. PoP or datacenter tokens in headers (airport-style codes in values such as `x-amz-cf-pop`, `x-served-by`, `cf-ray`, `x-rq`) are more reliable than GeoIP for anycast edges — prefer them over the hop city, and write just the token with the place it names (e.g. `hhn1 (Frankfurt-Hahn)`); the report shows any disagreement with GeoIP itself.
+- `Vary` lists the request headers that split the cache key: a value such as `X-Geo-Region` means the cache keeps a separate copy per region — mention it when it matters for the verdict or a finding.
+- Findings are things to fix or check (risks, misconfigurations, missed caching opportunities); never restate the verdict as a finding.
 
 ## Provider identity (§4.5)
 

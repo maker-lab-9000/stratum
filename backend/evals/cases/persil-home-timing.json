@@ -1,0 +1,753 @@
+{
+  "name": "persil-home-timing",
+  "url": "https://www.persil.de/",
+  "source": {
+    "report_link": "http://127.0.0.1:8000/reports/a43c4a8b-df49-46dc-b0c1-21ce889b7711",
+    "report_id": "a43c4a8b-df49-46dc-b0c1-21ce889b7711",
+    "captured_at": "2026-10-31T13:38:19Z",
+    "vantage": "unknown vantage",
+    "provider": "anthropic",
+    "model": "claude-opus-4-8"
+  },
+  "evidence": {
+    "dns": {
+      "a": [
+        "18.245.31.84",
+        "18.245.31.60",
+        "18.245.31.31",
+        "18.245.31.46"
+      ],
+      "aaaa": [
+        "2600:9000:266e:c400:10:de12:d640:93a1",
+        "2600:9000:266e:e400:10:de12:d640:93a1",
+        "2600:9000:266e:4200:10:de12:d640:93a1",
+        "2600:9000:266e:a400:10:de12:d640:93a1",
+        "2600:9000:266e:2800:10:de12:d640:93a1",
+        "2600:9000:266e:7e00:10:de12:d640:93a1",
+        "2600:9000:266e:f600:10:de12:d640:93a1",
+        "2600:9000:266e:d000:10:de12:d640:93a1"
+      ],
+      "cname_chain": [
+        {
+          "name": "www.persil.de",
+          "cname": "d3fcbz57t4izbt.cloudfront.net",
+          "ttl": 16789
+        }
+      ],
+      "ns": [
+        "ns-2040.awsdns-63.co.uk",
+        "ns-303.awsdns-37.com",
+        "ns-998.awsdns-60.net",
+        "ns-1292.awsdns-33.org"
+      ],
+      "ttl": 60,
+      "truncated": false
+    },
+    "samples": [
+      {
+        "request": 1,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.persil.de/",
+        "headers": [
+          [
+            "server",
+            "CloudFront"
+          ],
+          [
+            "content-type",
+            "text/html;charset=utf-8"
+          ],
+          [
+            "content-length",
+            "47048"
+          ],
+          [
+            "x-timer",
+            "S1793453850.647608,VS0,VS0,VE3"
+          ],
+          [
+            "x-vhost",
+            "https://www.persil.de"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=31536000; includeSubDomains"
+          ],
+          [
+            "cache-control",
+            "max-age=900,stale-while-revalidate=604800"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "dispatcher-age",
+            ""
+          ],
+          [
+            "server-timing",
+            "cdn-cache;dur=613"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sat, 31 Oct 2026 13:37:29 GMT"
+          ],
+          [
+            "x-served-by",
+            "cache-fra-etou8220040-FRA"
+          ],
+          [
+            "vary",
+            "CloudFront-Viewer-Country,Accept-Encoding"
+          ],
+          [
+            "via",
+            "1.1 e94bd6405e7651c50e73077af1691486.cloudfront.net (CloudFront)"
+          ],
+          [
+            "age",
+            "613"
+          ],
+          [
+            "x-cache",
+            "Miss from cloudfront"
+          ],
+          [
+            "x-amz-cf-pop",
+            "TXL50-P4"
+          ],
+          [
+            "x-amz-cf-id",
+            "CqsRQ9o30ZySYdKbtlYfl0MPUVADsQiBfybd9H2XzzTqa-y_p__qKA=="
+          ]
+        ],
+        "elapsed_ms": 108.948,
+        "started_at_ms": 4.372,
+        "error": null,
+        "peer_ip": "18.64.119.114",
+        "timing": {
+          "connect_ms": 18.7,
+          "tls_ms": 23.0,
+          "ttfb_ms": 51.6,
+          "total_ms": 108.9,
+          "rtt_ms": 12.9
+        }
+      },
+      {
+        "request": 2,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.persil.de/",
+        "headers": [
+          [
+            "server",
+            "CloudFront"
+          ],
+          [
+            "content-type",
+            "text/html;charset=utf-8"
+          ],
+          [
+            "content-length",
+            "47048"
+          ],
+          [
+            "x-timer",
+            "S1793453851.210706,VS0,VS0,VE2"
+          ],
+          [
+            "x-vhost",
+            "https://www.persil.de"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=31536000; includeSubDomains"
+          ],
+          [
+            "cache-control",
+            "max-age=900,stale-while-revalidate=604800"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "dispatcher-age",
+            ""
+          ],
+          [
+            "server-timing",
+            "cdn-cache;dur=614"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sat, 31 Oct 2026 13:37:31 GMT"
+          ],
+          [
+            "x-served-by",
+            "cache-fra-etou8220035-FRA"
+          ],
+          [
+            "vary",
+            "CloudFront-Viewer-Country,Accept-Encoding"
+          ],
+          [
+            "via",
+            "1.1 e94bd6405e7651c50e73077af1691486.cloudfront.net (CloudFront)"
+          ],
+          [
+            "age",
+            "614"
+          ],
+          [
+            "x-cache",
+            "Miss from cloudfront"
+          ],
+          [
+            "x-amz-cf-pop",
+            "TXL50-P4"
+          ],
+          [
+            "x-amz-cf-id",
+            "bCSGjJtGIehkOFMYAvBBfIsk3eISDqaWKZ8ImSQ5hf0z3hswD_3ayw=="
+          ]
+        ],
+        "elapsed_ms": 53.185,
+        "started_at_ms": 1615.291,
+        "error": null,
+        "peer_ip": "18.64.119.114",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 50.2,
+          "total_ms": 53.2,
+          "rtt_ms": null
+        }
+      },
+      {
+        "request": 3,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.persil.de/",
+        "headers": [
+          [
+            "server",
+            "CloudFront"
+          ],
+          [
+            "content-type",
+            "text/html;charset=utf-8"
+          ],
+          [
+            "content-length",
+            "47048"
+          ],
+          [
+            "x-timer",
+            "S1793453853.761607,VS0,VS0,VE2"
+          ],
+          [
+            "x-vhost",
+            "https://www.persil.de"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=31536000; includeSubDomains"
+          ],
+          [
+            "cache-control",
+            "max-age=900,stale-while-revalidate=604800"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "dispatcher-age",
+            ""
+          ],
+          [
+            "server-timing",
+            "cdn-cache;dur=616"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sat, 31 Oct 2026 13:37:32 GMT"
+          ],
+          [
+            "x-served-by",
+            "cache-fra-etou8220076-FRA"
+          ],
+          [
+            "vary",
+            "CloudFront-Viewer-Country,Accept-Encoding"
+          ],
+          [
+            "via",
+            "1.1 e94bd6405e7651c50e73077af1691486.cloudfront.net (CloudFront)"
+          ],
+          [
+            "age",
+            "616"
+          ],
+          [
+            "x-cache",
+            "Miss from cloudfront"
+          ],
+          [
+            "x-amz-cf-pop",
+            "TXL50-P4"
+          ],
+          [
+            "x-amz-cf-id",
+            "EoLZjQDXXWEIUE9n0AlE9ANToySbqb-WnCSbfwzQvBTNY5XnX7se-g=="
+          ]
+        ],
+        "elapsed_ms": 48.088,
+        "started_at_ms": 3170.016,
+        "error": null,
+        "peer_ip": "18.64.119.114",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 42.2,
+          "total_ms": 48.1,
+          "rtt_ms": null
+        }
+      },
+      {
+        "request": 4,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.persil.de/",
+        "headers": [
+          [
+            "server",
+            "CloudFront"
+          ],
+          [
+            "content-type",
+            "text/html;charset=utf-8"
+          ],
+          [
+            "content-length",
+            "47048"
+          ],
+          [
+            "x-timer",
+            "S1793453854.329055,VS0,VS0,VE2"
+          ],
+          [
+            "x-vhost",
+            "https://www.persil.de"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=31536000; includeSubDomains"
+          ],
+          [
+            "cache-control",
+            "max-age=900,stale-while-revalidate=604800"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "dispatcher-age",
+            ""
+          ],
+          [
+            "server-timing",
+            "cdn-cache;dur=617"
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sat, 31 Oct 2026 13:37:34 GMT"
+          ],
+          [
+            "x-served-by",
+            "cache-fra-etou8220107-FRA"
+          ],
+          [
+            "vary",
+            "CloudFront-Viewer-Country,Accept-Encoding"
+          ],
+          [
+            "via",
+            "1.1 e94bd6405e7651c50e73077af1691486.cloudfront.net (CloudFront)"
+          ],
+          [
+            "age",
+            "617"
+          ],
+          [
+            "x-cache",
+            "Miss from cloudfront"
+          ],
+          [
+            "x-amz-cf-pop",
+            "TXL50-P4"
+          ],
+          [
+            "x-amz-cf-id",
+            "-N4uAFzgjOTh3slGiCg8ZNA0XNJ8zJQXQ94XsIXJCI9NcrlUlqOXWA=="
+          ]
+        ],
+        "elapsed_ms": 66.188,
+        "started_at_ms": 4721.001,
+        "error": null,
+        "peer_ip": "18.64.119.114",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 63.4,
+          "total_ms": 66.2,
+          "rtt_ms": null
+        }
+      },
+      {
+        "request": 5,
+        "ok": true,
+        "status": 200,
+        "http_version": "HTTP/2",
+        "url": "https://www.persil.de/?stratum-cb=eff17f227004e136",
+        "headers": [
+          [
+            "server",
+            "CloudFront"
+          ],
+          [
+            "content-type",
+            "text/html;charset=utf-8"
+          ],
+          [
+            "content-length",
+            "47051"
+          ],
+          [
+            "x-timer",
+            "S1793453854.426342,VS0,VS0,VE34"
+          ],
+          [
+            "x-vhost",
+            "https://www.persil.de"
+          ],
+          [
+            "x-xss-protection",
+            "1; mode=block"
+          ],
+          [
+            "x-frame-options",
+            "SAMEORIGIN"
+          ],
+          [
+            "strict-transport-security",
+            "max-age=31536000; includeSubDomains"
+          ],
+          [
+            "cache-control",
+            "max-age=900,stale-while-revalidate=604800"
+          ],
+          [
+            "content-encoding",
+            "gzip"
+          ],
+          [
+            "dispatcher-age",
+            ""
+          ],
+          [
+            "server-timing",
+            "dispatcher-cache;dur="
+          ],
+          [
+            "x-content-type-options",
+            "nosniff"
+          ],
+          [
+            "accept-ranges",
+            "bytes"
+          ],
+          [
+            "date",
+            "Sat, 31 Oct 2026 13:37:34 GMT"
+          ],
+          [
+            "x-served-by",
+            "cache-fra-etou8220130-FRA"
+          ],
+          [
+            "vary",
+            "CloudFront-Viewer-Country,Accept-Encoding"
+          ],
+          [
+            "via",
+            "1.1 e94bd6405e7651c50e73077af1691486.cloudfront.net (CloudFront)"
+          ],
+          [
+            "age",
+            "0"
+          ],
+          [
+            "set-cookie",
+            "affinity=\"0c63294ec37978c3\"; Path=/; HttpOnly; secure"
+          ],
+          [
+            "x-cache",
+            "Miss from cloudfront"
+          ],
+          [
+            "x-amz-cf-pop",
+            "TXL50-P4"
+          ],
+          [
+            "x-amz-cf-id",
+            "ntjdcGNoswQseoQP5pjq11Jx8zw396Ekv7SVKJDlsoKveVdGb95jqg=="
+          ]
+        ],
+        "elapsed_ms": 80.933,
+        "started_at_ms": 4832.74,
+        "error": null,
+        "peer_ip": "18.64.119.114",
+        "timing": {
+          "connect_ms": null,
+          "tls_ms": null,
+          "ttfb_ms": 76.7,
+          "total_ms": 80.9,
+          "rtt_ms": null
+        },
+        "probe": "cache_bust"
+      }
+    ],
+    "traceroute": {
+      "tool": "mtr",
+      "target": "www.persil.de",
+      "port": 443,
+      "timed_out": false,
+      "error": {
+        "type": "TraceroutePermissionError",
+        "message": "mtr-packet: Failure to open IPv4 sockets\nmtr-packet: Failure to open IPv6 sockets\nmtr: Failure to start mtr-packet: Invalid argument",
+        "hint": "The traceroute tool needs raw-socket privileges. In Docker grant the api service NET_RAW (and likely NET_ADMIN), or use host networking (spec §9)."
+      },
+      "hops": [],
+      "geo_available": false,
+      "enrichment_notes": [
+        "MaxMind GeoLite2 ASN/City database unavailable; ASN/geo shown as 'unknown'. Set MAXMIND_LICENSE_KEY to download the offline databases (spec §3.4, §9.1)."
+      ],
+      "seam": {
+        "status": "unconfirmed",
+        "traced_ip": null,
+        "peer_ips": [
+          "18.64.119.114"
+        ]
+      }
+    }
+  },
+  "original_verdict": {
+    "cached": true,
+    "confidence": "high",
+    "provider": "Amazon CloudFront (outer edge) over Fastly/Varnish (inner shared cache)",
+    "provider_evidence": [
+      "cname: www.persil.de -> d3fcbz57t4izbt.cloudfront.net",
+      "server: CloudFront",
+      "via: 1.1 e94bd6405e7651c50e73077af1691486.cloudfront.net (CloudFront)",
+      "x-served-by: cache-fra-etou8220040-FRA",
+      "x-timer: S1793453850.647608,VS0,VS0,VE3"
+    ],
+    "serving_layer": "Fastly/Varnish inner shared cache (FRA)",
+    "layer_count_to_origin": 2,
+    "layers": [
+      {
+        "layer_name": "CloudFront edge",
+        "vendor": "Amazon CloudFront",
+        "cache_type": "CDN edge cache",
+        "role": "edge",
+        "caches": true,
+        "state": "MISS",
+        "evidence_headers": [
+          "x-cache: Miss from cloudfront",
+          "via: 1.1 e94bd6405e7651c50e73077af1691486.cloudfront.net (CloudFront)",
+          "x-amz-cf-pop: TXL50-P4",
+          "server: CloudFront"
+        ]
+      },
+      {
+        "layer_name": "Fastly/Varnish inner shared cache (FRA)",
+        "vendor": "Fastly/Varnish",
+        "cache_type": "shared reverse-proxy cache",
+        "role": "shield",
+        "caches": true,
+        "state": "HIT",
+        "evidence_headers": [
+          "age: 613",
+          "x-served-by: cache-fra-etou8220040-FRA",
+          "x-timer: S1793453850.647608,VS0,VS0,VE3"
+        ]
+      }
+    ],
+    "sample_states": [
+      {
+        "request": 1,
+        "state": "HIT",
+        "evidence_headers": [
+          "age: 613",
+          "x-served-by: cache-fra-etou8220040-FRA",
+          "x-cache: Miss from cloudfront"
+        ]
+      },
+      {
+        "request": 2,
+        "state": "HIT",
+        "evidence_headers": [
+          "age: 614",
+          "x-served-by: cache-fra-etou8220035-FRA",
+          "x-cache: Miss from cloudfront"
+        ]
+      },
+      {
+        "request": 3,
+        "state": "HIT",
+        "evidence_headers": [
+          "age: 616",
+          "x-served-by: cache-fra-etou8220076-FRA",
+          "x-cache: Miss from cloudfront"
+        ]
+      },
+      {
+        "request": 4,
+        "state": "HIT",
+        "evidence_headers": [
+          "age: 617",
+          "x-served-by: cache-fra-etou8220107-FRA",
+          "x-cache: Miss from cloudfront"
+        ]
+      }
+    ],
+    "confidence_reason": "CloudFront reports MISS on every sample but Age is 613-617 and Fastly fingerprints (x-served-by cache-*, x-timer VS/VE) are leaked, proving a downstream shared cache served the object.",
+    "timing_check": {
+      "status": "consistent",
+      "summary": "Warm server_ms (29-50ms) sits well below the cache_bust origin baseline of 63.8ms, consistent with an inner shared cache serving the warm requests rather than a full origin trip. The cache-bust probe shows age: 0 with a longer x-timer VE34, matching a genuine origin fetch.",
+      "hidden_layer_suspected": false,
+      "confidence": "medium",
+      "evidence": [
+        "warm server_ms median: 37.3",
+        "warm server_ms max: 50.5",
+        "cache_bust server_ms: 63.8",
+        "edge_rtt_ms: 12.9",
+        "age: 0"
+      ]
+    },
+    "validation": {
+      "ok": false,
+      "flags": [
+        {
+          "path": "security_findings[2].evidence_header",
+          "citation": "set-cookie: affinity=\"0c63294ec37978c3\"; Path=/; HttpOnly; secure",
+          "reason": "cited header appears only on the cache-bust probe"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "serving": {
+      "label": "Fastly",
+      "match": [
+        "fastly",
+        "varnish"
+      ]
+    },
+    "chain": [
+      {
+        "label": "CloudFront edge",
+        "match": [
+          "cloudfront"
+        ]
+      },
+      {
+        "label": "Fastly",
+        "match": [
+          "fastly",
+          "varnish"
+        ]
+      },
+      {
+        "label": "origin",
+        "role": [
+          "origin"
+        ]
+      }
+    ],
+    "notes": "Operator-confirmed: CloudFront fronts Fastly; CloudFront overwrites Fastly's x-cache, so the inner hit shows only via non-zero Age + leaked x-served-by/x-timer. Origin is required in the chain."
+  }
+}

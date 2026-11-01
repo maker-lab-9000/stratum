@@ -171,6 +171,94 @@ async def test_timeout_on_third_request_keeps_others():
     assert samples[3]["status"] == 200
 
 
+# --- Timing corroboration (1.2.0) --------------------------------------------
+
+import re  # noqa: E402
+from urllib.parse import parse_qs, urlsplit  # noqa: E402
+
+
+async def test_sample_has_timing_and_peer_ip():
+    server = await _serve(_default_responder)
+    try:
+        samples = await sample_requests(server.base_url + "/", request_count=2)
+    finally:
+        await server.stop()
+
+    for sample in samples:
+        assert sample["peer_ip"] == "127.0.0.1"
+        timing = sample["timing"]
+        assert set(timing) == {"connect_ms", "tls_ms", "ttfb_ms", "total_ms", "rtt_ms"}
+        assert timing["ttfb_ms"] > 0
+        assert timing["total_ms"] >= timing["ttfb_ms"]
+        assert timing["tls_ms"] is None  # plain http
+    assert isinstance(samples[0]["timing"]["connect_ms"], float)
+    assert samples[0]["timing"]["connect_ms"] >= 0
+    assert json.loads(json.dumps(samples)) == samples
+
+
+async def test_cache_bust_probe_appended():
+    server = await _serve(_default_responder)
+    try:
+        samples = await sample_requests(server.base_url + "/", request_count=3, cache_bust_probe=True)
+        with_query = await sample_requests(server.base_url + "/page?a=1", request_count=1,
+                                           cache_bust_probe=True)
+    finally:
+        await server.stop()
+
+    assert len(samples) == 4
+    probe = samples[-1]
+    assert probe["probe"] == "cache_bust"
+    assert probe["request"] == 4
+    assert all("probe" not in s for s in samples[:3])
+    paths = [r["path"] for r in server.received]
+    assert all("stratum-cb" not in p for p in paths[:3])
+    query = parse_qs(urlsplit(paths[3]).query)
+    assert re.fullmatch(r"[0-9a-f]{8,}", query["stratum-cb"][0])
+    probe_query = parse_qs(urlsplit(server.received[-1]["path"]).query)
+    assert probe_query["a"] == ["1"] and "stratum-cb" in probe_query
+    assert with_query[-1]["probe"] == "cache_bust"
+
+
+async def test_probe_off_by_default():
+    server = await _serve(_default_responder)
+    try:
+        samples = await sample_requests(server.base_url + "/", request_count=2)
+    finally:
+        await server.stop()
+    assert all("probe" not in s for s in samples)
+
+
+async def test_probe_failure_does_not_fail_run():
+    async def responder(count, request):
+        if count == 4:
+            await asyncio.sleep(1.0)
+        return await _default_responder(count, request)
+
+    server = await _serve(responder)
+    try:
+        samples = await sample_requests(server.base_url + "/", request_count=3, timeout_ms=300,
+                                        cache_bust_probe=True)
+    finally:
+        await server.stop()
+    assert [s["ok"] for s in samples[:3]] == [True, True, True]
+    assert samples[3]["probe"] == "cache_bust"
+    assert samples[3]["ok"] is False
+
+
+async def test_rtt_measured_by_bare_connect_to_peer_ip():
+    """Final review fix: the edge round trip is a bare TCP connect to the peer IP
+    (no DNS inside the timed span), recorded on request 1 only."""
+    server = await _serve(_default_responder)
+    try:
+        samples = await sample_requests(server.base_url.replace("127.0.0.1", "localhost") + "/",
+                                        request_count=2)
+    finally:
+        await server.stop()
+    rtt = samples[0]["timing"]["rtt_ms"]
+    assert isinstance(rtt, float) and rtt >= 0
+    assert samples[1]["timing"]["rtt_ms"] is None
+
+
 # --- edge -------------------------------------------------------------------
 
 async def test_zero_request_count_returns_empty():

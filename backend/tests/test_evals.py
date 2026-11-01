@@ -717,3 +717,17 @@ def test_makefile_eval_capture_recipe_is_silent():
     makefile = (Path(__file__).resolve().parents[2] / "Makefile").read_text()
     recipe = makefile.split("eval-capture:", 1)[1].splitlines()[1]
     assert recipe.lstrip("\t").startswith("@"), "make would echo a user:pass@ link"
+
+
+# --- 1.2.0: probe-aware consumers ---------------------------------------------
+
+from evals.capture import non_2xx_summary  # noqa: E402
+
+
+def test_non_2xx_summary_ignores_probe():
+    ok = [{**s, "status": 200} for s in GOLDEN["samples"]]
+    blocked = [{**s, "status": 403} for s in GOLDEN["samples"]]
+    probe_403 = {**GOLDEN["samples"][0], "request": 5, "status": 403, "probe": "cache_bust"}
+    probe_200 = {**probe_403, "status": 200}
+    assert non_2xx_summary(ok + [probe_403]) is None
+    assert non_2xx_summary(blocked + [probe_200]) == "403×4"

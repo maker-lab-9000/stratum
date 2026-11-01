@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { historyRows, mockApi, RUNNING_FRAMES } from "./mocks";
+import { changingHeaderReport, historyRows, LONG_MODELS, longReport, mockApi, RUNNING_FRAMES } from "./mocks";
 
 // Scenario 5: the layout holds at desktop (1280) and mobile (390) — the mockup's
 // two reference widths. A committed pixel baseline is deliberately avoided
@@ -22,10 +22,11 @@ for (const { label, width, height } of WIDTHS) {
   test(`report holds at ${label} (${width}px), no page h-scroll`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height });
     await page.goto("/dev/report");
-    await expect(page.getByTestId("chain")).toBeVisible();
+    await expect(page.locator(".strata")).toBeVisible();
     // Key regions of the report are all present.
-    await expect(page.getByTestId("history").or(page.locator(".verdict")).first()).toBeVisible();
-    await expect(page.locator(".find-grid")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What the requests showed" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What to look at" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Where it's hosted" })).toBeVisible();
     await expect(page.locator(".drawer")).toBeVisible();
     expect(await noHorizontalScroll(page)).toBe(true);
     await testInfo.attach(`report-${label}`, {
@@ -52,3 +53,31 @@ test("launch, history and live hold at 390px with no page h-scroll", async ({ pa
   await expect(page.getByTestId("stepper")).toBeVisible();
   expect(await noHorizontalScroll(page)).toBe(true);
 });
+
+test("report with long values has no horizontal scroll at 390", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await mockApi(page, { report: longReport() });
+  await page.goto("/reports/long");
+  await expect(page.locator(".strata")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What the requests showed" })).toBeVisible();
+  expect(await noHorizontalScroll(page)).toBe(true);
+});
+
+test("launch with a long model list has no horizontal scroll at 390", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await mockApi(page, { models: LONG_MODELS });
+  await page.goto("/");
+  await expect(page.locator("#model")).toBeAttached();
+  expect(await noHorizontalScroll(page)).toBe(true);
+});
+
+test("a long changing-header value doesn't squeeze the other request columns", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockApi(page, { report: changingHeaderReport() });
+  await page.goto("/reports/changing");
+  const heads = page.locator("table.prog thead th");
+  await expect(heads).toHaveCount(5); // Signal + 4 requests
+  const widths = await heads.evaluateAll((ths) => ths.slice(1).map((th) => th.getBoundingClientRect().width));
+  expect(Math.max(...widths) / Math.min(...widths)).toBeLessThan(1.6);
+});
+

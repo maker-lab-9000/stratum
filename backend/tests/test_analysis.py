@@ -44,6 +44,9 @@ VALID_RESULT = {
             {"request": 1, "state": "MISS", "evidence_headers": ["X-Cache: TCP_MISS from a23-fra"]},
             {"request": 2, "state": "MISS", "evidence_headers": ["X-Cache: TCP_MISS from a23-fra"]},
         ],
+        "confidence_reason": "",
+        "timing_check": {"status": "insufficient", "summary": "", "hidden_layer_suspected": False,
+                         "confidence": "low", "evidence": []},
     },
     "overall_summary": "CDN bypass: Akamai edge is not storing the object; served from the Apache Dispatcher.",
     "segment_narration": [
@@ -241,3 +244,155 @@ async def test_live_real_model_produces_valid_result():
     # The bypass story: Akamai edge with flat Age 0 / no-cache should not be a HIT.
     assert result.cache_verdict.provider  # some provider identified
     assert result.overall_summary
+
+
+# --- 1.2.0: timing corroboration ----------------------------------------------
+
+import copy  # noqa: E402
+
+
+from app.llm.analysis import parse_structured_result  # noqa: E402
+
+
+def test_parse_with_timing_check():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["timing_check"] = {
+        "status": "gap", "summary": "s", "hidden_layer_suspected": True,
+        "confidence": "medium", "evidence": ["edge_rtt_ms: 38.2"],
+    }
+    data["cache_verdict"]["confidence_reason"] = "r"
+    cv = parse_structured_result(json.dumps(data)).cache_verdict
+    assert cv.confidence_reason == "r"
+    assert cv.timing_check.status == "gap"
+    assert cv.timing_check.hidden_layer_suspected is True
+    assert cv.timing_check.evidence == ["edge_rtt_ms: 38.2"]
+    # A bad status no longer fails the parse (final-review fix: never lose the
+    # verdict over the new fields) — the timing_check is dropped and marked.
+    data["cache_verdict"]["timing_check"]["status"] = "maybe"
+    bad = parse_structured_result(json.dumps(data)).cache_verdict
+    assert bad.timing_check is None and bad.timing_check_error == "malformed"
+
+
+def test_parse_without_new_fields():
+    data = copy.deepcopy(VALID_RESULT)
+    del data["cache_verdict"]["timing_check"], data["cache_verdict"]["confidence_reason"]
+    cv = parse_structured_result(json.dumps(data)).cache_verdict
+    assert cv.timing_check is None
+    assert cv.confidence_reason == ""
+
+
+def test_prompt_timing_guidance():
+    for marker in ("timing_check", "confidence_reason", "timing.facts", "warm server_ms",
+                   "cache_bust", "clearly exceeds the warm spread",
+                   "Timing never adds, removes, or re-states layers"):
+        assert marker in SYSTEM_PROMPT, marker
+    assert "Do not infer cache layers from traceroute hops." in SYSTEM_PROMPT
+
+
+
+# (field, value, expected timing_check: "malformed" -> dropped + flagged later,
+#  or a dict of attributes the coerced TimingCheck must have)
+_MALFORMED = {
+    "reason-null": ("confidence_reason", None, None),
+    "status-unknown": ("timing_check", {"status": "inconclusive", "summary": "x"}, "malformed"),
+    "confidence-unknown": ("timing_check", {"status": "gap", "confidence": "moderate"}, "malformed"),
+    "evidence-null": ("timing_check", {"status": "gap", "evidence": None}, {"evidence": []}),
+    "summary-null": ("timing_check", {"status": "consistent", "summary": None}, {"summary": ""}),
+    "empty-object": ("timing_check", {}, "malformed"),
+    "not-an-object": ("timing_check", "gap", "malformed"),
+}
+
+
+@pytest.mark.parametrize("field,value,expected", list(_MALFORMED.values()), ids=list(_MALFORMED))
+def test_malformed_new_fields_do_not_lose_verdict(field, value, expected):
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"][field] = value
+    cv = parse_structured_result(json.dumps(data)).cache_verdict  # must not raise
+    assert isinstance(cv.confidence_reason, str)
+    if expected == "malformed":
+        assert cv.timing_check is None
+        assert cv.timing_check_error == "malformed"
+    elif isinstance(expected, dict):
+        for attr, want in expected.items():
+            assert getattr(cv.timing_check, attr) == want
+
+
+def test_prompt_probe_header_citation_rule():
+    assert "only inside `timing_check` and for the origin layer" in SYSTEM_PROMPT
+    assert "cite the probe's headers as plain" in SYSTEM_PROMPT
+
+
+def test_prompt_real_data_guidance():
+    for marker in (
+        "PoP or datacenter",                 # location from headers over GeoIP
+        "more reliable than GeoIP",
+        "WordPress VIP",                     # vendor table row
+        "never restate the verdict",         # findings are things to fix or check
+        "Vary",                              # cache-key splits
+    ):
+        assert marker in SYSTEM_PROMPT, marker
+
+
+# --- 1.3.0: story fields + per-claim confidence --------------------------------
+
+def test_parse_new_story_fields():
+    data = copy.deepcopy(VALID_RESULT)
+    cv = data["cache_verdict"]
+    cv["headline"] = "Served from the Apache Dispatcher."
+    cv["headline_detail"] = "Akamai passed every request on."
+    cv["provider_confidence"] = "high"
+    cv["layers"][0]["confidence"] = "medium"
+    cv["layers"][0]["location"] = "Frankfurt"
+    data["security_findings"][0]["confidence"] = "low"
+    parsed = parse_structured_result(json.dumps(data))
+    pv = parsed.cache_verdict
+    assert pv.headline == "Served from the Apache Dispatcher."
+    assert pv.headline_detail == "Akamai passed every request on."
+    assert pv.provider_confidence == "high"
+    assert pv.layers[0].confidence == "medium" and pv.layers[0].location == "Frankfurt"
+    assert parsed.security_findings[0].confidence == "low"
+
+
+@pytest.mark.parametrize("bad", ["moderate", "very high", 5, None])
+def test_story_fields_optional_and_coerced(bad):
+    plain = parse_structured_result(json.dumps(VALID_RESULT))
+    pv = plain.cache_verdict
+    assert pv.headline == "" and pv.headline_detail == ""
+    assert pv.provider_confidence is None
+    assert pv.layers[0].confidence is None and pv.layers[0].location == ""
+    assert plain.security_findings[0].confidence is None
+
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["provider_confidence"] = bad
+    data["cache_verdict"]["layers"][0]["confidence"] = bad
+    data["performance_findings"][0]["confidence"] = bad
+    data["cache_verdict"]["headline"] = None
+    data["cache_verdict"]["layers"][0]["location"] = None
+    coerced = parse_structured_result(json.dumps(data))  # never raises
+    assert coerced.cache_verdict.provider_confidence is None
+    assert coerced.cache_verdict.layers[0].confidence is None
+    assert coerced.performance_findings[0].confidence is None
+    assert coerced.cache_verdict.headline == ""
+    assert coerced.cache_verdict.layers[0].location == ""
+
+
+def test_prompt_story_rules():
+    for marker in ("headline", "headline_detail", "provider_confidence", "location",
+                   "Always list the origin as the last layer", "at most 100 characters"):
+        assert marker in SYSTEM_PROMPT, marker
+
+
+def test_confidence_values_are_case_insensitive():
+    data = copy.deepcopy(VALID_RESULT)
+    data["cache_verdict"]["confidence"] = "High"
+    data["cache_verdict"]["provider_confidence"] = " Medium "
+    data["cache_verdict"]["layers"][0]["confidence"] = "LOW"
+    data["cache_verdict"]["timing_check"] = {"status": "gap", "confidence": "High", "evidence": []}
+    data["performance_findings"][0]["confidence"] = "High"
+    parsed = parse_structured_result(json.dumps(data))  # must not raise / drop the verdict
+    cv = parsed.cache_verdict
+    assert cv.confidence == "high"
+    assert cv.provider_confidence == "medium"
+    assert cv.layers[0].confidence == "low"
+    assert cv.timing_check is not None and cv.timing_check.confidence == "high"
+    assert parsed.performance_findings[0].confidence == "high"
