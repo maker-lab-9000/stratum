@@ -174,6 +174,32 @@ class Finding(BaseModel):
         return _optional_confidence(value)
 
 
+class InvestigationStep(BaseModel):
+    """1.4.0: one request the model asked for, in its own words."""
+
+    request: int
+    purpose: str
+    observed: str
+
+
+class Investigation(BaseModel):
+    summary: str
+    steps: list[InvestigationStep] = []
+
+
+class Recommendation(BaseModel):
+    """1.4.0: what else would settle an open question, when the tools weren't enough."""
+
+    action: str
+    reason: str
+    confidence: Confidence | None = None
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _confidence(cls, value):
+        return _optional_confidence(value)
+
+
 class StructuredResult(BaseModel):
     """The full §5.2 analysis result. Extra keys from the model are ignored."""
 
@@ -182,3 +208,6 @@ class StructuredResult(BaseModel):
     segment_narration: list[SegmentNarration]
     security_findings: list[Finding]
     performance_findings: list[Finding]
+    # 1.4.0 — present only in investigate mode; absent/null otherwise.
+    investigation: Investigation | None = None
+    recommendations: list[Recommendation] = []

@@ -82,8 +82,21 @@ OUTPUT_SCHEMA = """\
       "description": "string",
       "evidence_header": "string",
       "confidence": "high|medium|low" }
+  ],
+  "investigation": {
+    "summary": "string",
+    "steps": [
+      { "request": 6, "purpose": "string", "observed": "string" }
+    ]
+  },
+  "recommendations": [
+    { "action": "string", "reason": "string", "confidence": "high|medium|low" }
   ]
-}"""
+}
+
+`investigation` and `recommendations` belong to investigate mode: omit them (or
+set `investigation` to null and `recommendations` to []) when you were not
+offered the request_page tool."""
 
 SYSTEM_PROMPT = f"""\
 You are the interpretation engine of Stratum, a cache & delivery analyzer. A
@@ -198,7 +211,7 @@ Fill `timing_check`:
 - `location`: a city or PoP for a layer, only when a captured header value or hop names it; otherwise an empty string. PoP or datacenter tokens in headers (airport-style codes in values such as `x-amz-cf-pop`, `x-served-by`, `cf-ray`, `x-rq`) are more reliable than GeoIP for anycast edges — prefer them over the hop city, and write just the token with the place it names (e.g. `hhn1 (Frankfurt-Hahn)`); the report shows any disagreement with GeoIP itself.
 - `Vary` lists the request headers that split the cache key: a value such as `X-Geo-Region` means the cache keeps a separate copy per region — mention it when it matters for the verdict or a finding.
 - Findings are things to fix or check (risks, misconfigurations, missed caching opportunities); never restate the verdict as a finding.
-- When a cache's hit/miss state is hidden (hit tokens stripped, `Age` reset) and the provider has a debug request header (see the vendor table), add an `info` performance finding suggesting a re-run with that header under More options → Custom request headers (e.g. `Fastly-Debug: 1`). Cite the header that shows the state is hidden.
+- When a cache's hit/miss state is hidden (hit tokens stripped, `Age` reset) and the provider has a debug request header (see the vendor table), add an `info` performance finding suggesting a re-run with that header under More options → Custom request headers (e.g. `Fastly-Debug: 1`), unless you could and did send it yourself in investigate mode. Cite the header that shows the state is hidden.
 
 ## Provider identity (§4.5)
 
@@ -214,4 +227,40 @@ Return a single JSON object with exactly these keys (no markdown fences, no
 prose before or after):
 
 {OUTPUT_SCHEMA}
+"""
+
+
+# --- 1.4.0: appended to SYSTEM_PROMPT only when the request_page tool is offered ---
+INVESTIGATE_PROMPT = """\
+## Investigating
+
+You have the `request_page` tool: it requests the same URL again with request
+headers you choose, optionally with a random cache-busting query parameter, and
+returns the response as a new sample (status, verbatim headers, timing, with
+the same `request <k>` numbering). You may call it up to 5 times. Use it when
+the evidence does not settle the serving layer, a layer's state, or a finding:
+
+- When the hit/miss state is hidden, send the vendor's debug request header from
+  the table above (e.g. `Fastly-Debug: 1`, Akamai's `Pragma` tokens).
+- When you need a known miss as a timing baseline, set `cache_bust: true`.
+- When `Vary` suggests a split cache key, change the header it names
+  (`User-Agent`, `Accept-Language`, …) and compare.
+- Say what each request should settle in `reason`. Do not repeat a request that
+  already answered its question. Stop when the question is settled.
+
+Investigation responses are samples like any other: cite their headers as
+`request <k>` headers for layers, sample states, the provider and findings. The
+cache-bust-only citation rule applies to the original probe and to your own
+`cache_bust: true` requests (cite those only in `timing_check` and for the
+origin layer). Their timing facts appear in `timing.facts` under their request
+number once the request is made.
+
+Fill the two extra output keys:
+- `investigation.summary`: one or two sentences on what you set out to settle
+  and whether you did. `investigation.steps`: one entry per request you made,
+  in order, with its `request` number, its `purpose` and what it `observed`.
+- `recommendations`: what else would settle the open questions and why, when
+  your requests were not enough (a run from another region, a vendor debug
+  header that needs a secret, comparing with the origin directly, a HEAD vs GET
+  check). An empty list is right when nothing is open.
 """

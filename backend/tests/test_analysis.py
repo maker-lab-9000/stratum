@@ -438,3 +438,40 @@ def test_prompt_hidden_cache_guidance():
         assert marker in SYSTEM_PROMPT, marker
     # The forced origin default is gone.
     assert "then `serving_layer` names the origin layer" not in SYSTEM_PROMPT
+
+
+# --- 1.4.0: investigate mode schema + prompt ---------------------------------
+
+from app.llm.prompt import INVESTIGATE_PROMPT, OUTPUT_SCHEMA  # noqa: E402
+
+
+def test_result_without_investigation_fields_still_parses():
+    parsed = StructuredResult.model_validate(copy.deepcopy(VALID_RESULT))
+    assert parsed.investigation is None
+    assert parsed.recommendations == []
+
+
+def test_investigation_and_recommendations_parse_and_coerce():
+    data = copy.deepcopy(VALID_RESULT)
+    data["investigation"] = {"summary": "Two probes.", "steps": [
+        {"request": 6, "purpose": "see tiers", "observed": "two tiers, both miss"}]}
+    data["recommendations"] = [
+        {"action": "Run from another region", "reason": "anycast edge", "confidence": "High"},
+        {"action": "Compare with origin", "reason": "no debug header available"}]
+    parsed = StructuredResult.model_validate(data)
+    assert parsed.investigation.steps[0].request == 6
+    assert parsed.recommendations[0].confidence == "high"
+    assert parsed.recommendations[1].confidence is None
+
+
+def test_investigate_prompt_markers():
+    for marker in ("## Investigating", "request_page", "up to 5", "investigation.steps",
+                   "recommendations", "`reason`"):
+        assert marker in INVESTIGATE_PROMPT, marker
+    assert INVESTIGATE_PROMPT not in SYSTEM_PROMPT  # appended only when the tool is offered
+    assert "did send it yourself" in SYSTEM_PROMPT
+
+
+def test_output_schema_lists_investigation_keys():
+    assert '"investigation"' in OUTPUT_SCHEMA and '"recommendations"' in OUTPUT_SCHEMA
+    assert '"observed"' in OUTPUT_SCHEMA and '"action"' in OUTPUT_SCHEMA
