@@ -23,6 +23,12 @@ Each step fills in as it measures: DNS, a browser warm-up, the sampled requests,
 
 ![Live run](docs/screenshots/live-run.png)
 
+### Let the model investigate (experiment)
+
+Tick **Let the model investigate** under More options and the model can ask for the page a few more times while it reads, with request headers of its own choosing, such as a CDN's debug header. It uses this when the first batch of evidence does not settle the answer. Every extra request is recorded and shown, and the report ends with what else could be tried.
+
+How it works: the model gets one tool, `request_page`, which fetches the same URL (never another) with the headers it names, at most five times per analysis. The tool is plain code: it performs the request, stores the response as a normal sample, and writes a log entry with exactly what was sent, what came back and what the model said at that moment. The model's answer is then checked against the enlarged evidence like any other claim. Only Anthropic models support it so far, and `make eval MODELS=... INVESTIGATE=1` runs the eval corpus with the mode off and on, side by side, to measure whether it helps.
+
 ## The report
 
 A real analysis of `https://www.kleinanzeigen.de/`, top to bottom.
@@ -38,6 +44,8 @@ The path from you to the origin drawn as stacked layers, with the headers that p
 Security and performance findings, sorted by severity, each pointing at the evidence that backs it.
 
 ![Findings](docs/screenshots/report-03-findings.png)
+
+When the model investigated, **What the model tried** lists each extra request it made, why, and what it observed, with the full call one click away, and **Recommendations** names what else could settle the open questions.
 
 Where the site actually lives: the vantage, the DNS chain, the server that answered, and the route that got there.
 
